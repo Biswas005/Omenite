@@ -614,4 +614,26 @@ if [ "$USING_PERSISTENT_KEYS" = false ]; then
     echo "⚠️  IMPORTANT: Consider setting up persistent key management"
     echo "   for production to avoid MOK re-enrollment after updates!"
 fi
+# Remove third-party repo files after packages are installed.
+# bootc-image-builder reads these during ISO manifest generation and
+# chokes on file:// GPG key paths that don't exist in its build context.
+# The packages are already installed — the repo files are no longer needed.
+echo "🧹 Removing third-party repo files..."
+
+rm -f /etc/yum.repos.d/terra-mesa.repo
+rm -f /etc/yum.repos.d/terra.repo
+rm -f /etc/yum.repos.d/vscode.repo
+rm -f /etc/yum.repos.d/nvidia-container-toolkit.repo
+rm -f /etc/yum.repos.d/tlp.repo
+rm -f /etc/yum.repos.d/_copr*.repo
+
+# Catch-all: remove any remaining repo with a file:// GPG key
+for repo in /etc/yum.repos.d/*.repo; do
+    if grep -q 'gpgkey=file://' "$repo" 2>/dev/null; then
+        echo "Removing $repo (has unresolvable file:// GPG key)"
+        rm -f "$repo"
+    fi
+done
+
+echo "✅ Third-party repo cleanup done"
 echo "================================="
