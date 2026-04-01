@@ -7,7 +7,8 @@ KDIR="/usr/src/kernels/${KERNEL_VERSION}"
 BUILD_DIR="/tmp/hp-wmi-build"
 SIGN_DIR="/etc/pki/module-signing"
 
-# Core packages + version-matched kernel build deps + NVIDIA userspace/kernel stack
+# On Bazzite, do not force-install NVIDIA packages here.
+# If you want NVIDIA baked in, use a Bazzite NVIDIA base image instead.
 dnf5 install -y \
   akmods \
   elfutils-libelf-devel \
@@ -15,19 +16,14 @@ dnf5 install -y \
   git \
   just \
   "kernel-devel-${KERNEL_VERSION}" \
-  "kernel-headers-${KERNEL_VERSION}" \
+  kernel-headers \
   kmod \
   make \
   mokutil \
   openssl \
   toolbox \
   tmux \
-  vim-enhanced \
-  xorg-x11-drv-nvidia \
-  xorg-x11-drv-nvidia-cuda \
-  nvidia-settings \
-  nvidia-modprobe \
-  libva-nvidia-driver
+  vim-enhanced
 
 mkdir -p /usr/lib/bootc/install
 cat > /usr/lib/bootc/install/00-omenite.toml <<'EOF'
@@ -110,10 +106,6 @@ fi
 
 mkdir -p "/usr/lib/modules/${KERNEL_VERSION}/extra"
 install -m 0644 "${BUILD_DIR}/hp-wmi.ko" "/usr/lib/modules/${KERNEL_VERSION}/extra/hp-wmi.ko"
-
-# Build NVIDIA akmods for the installed kernel
-akmods --force --kernels "${KERNEL_VERSION}" || true
-
 depmod -a "${KERNEL_VERSION}"
 
 mkdir -p /etc/modules-load.d /etc/modprobe.d
@@ -124,10 +116,6 @@ EOF
 
 cat > /etc/modprobe.d/omenite-hp-wmi.conf <<'EOF'
 # Prefer the custom Omenite hp-wmi module from /usr/lib/modules/*/extra.
-EOF
-
-cat > /etc/modprobe.d/omenite-nvidia.conf <<'EOF'
-options nvidia-drm modeset=1
 EOF
 
 mkdir -p /usr/share/ublue-os/just
@@ -148,12 +136,6 @@ test-omenite-hp-wmi:
 	sudo modprobe -r hp-wmi || true
 	sudo modprobe hp-wmi
 	modinfo hp-wmi | sed -n '1,20p'
-
-test-omenite-nvidia:
-	#!/usr/bin/bash
-	set -euo pipefail
-	modinfo nvidia | sed -n '1,20p'
-	modinfo nvidia_drm | sed -n '1,20p'
 EOF
 
 systemctl enable podman.socket
