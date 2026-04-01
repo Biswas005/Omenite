@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="8" dy="12" stdDeviation="8" flood-opacity="0.3"/></filter></defs>
+  <polygon points="256,38 474,256 256,474 38,256" fill="#bb0a1e" filter="url(#s)"/>
+  <polygon points="256,96 416,256 256,416 96,256" fill="#0a0a0c"/>
+  <polygon points="256,62 450,256 256,450 62,256" fill="none" stroke="#ff6c88" stroke-opacity="0.45" stroke-width="4"/>
+</svg>

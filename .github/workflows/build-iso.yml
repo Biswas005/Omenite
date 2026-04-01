@@ -1,0 +1,13 @@
+name: Legacy ISO build wrapper
+
+on:
+  workflow_dispatch:
+
+jobs:
+  info:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          echo "Use the 'Build disk images' workflow."
+          echo "Anaconda ISO config is only at disk_config/iso.toml."
+          echo "There is no root-level iso.toml in this repo."
