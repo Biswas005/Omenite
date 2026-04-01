@@ -94,6 +94,10 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           oci: false
+          build-args: |
+            module_signing_key=${{ secrets.MODULE_SIGNING_KEY }}
+            module_signing_crt=${{ secrets.MODULE_SIGNING_CRT }}
+            module_signing_der=${{ secrets.MODULE_SIGNING_DER }}
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -135,17 +139,4 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${COSIGN_PRIVATE_KEY:-}" ]]; then
-            echo "SIGNING_SECRET is not set; skipping image signing"
-            exit 0
-          fi
-
-          if grep -q 'BEGIN ENCRYPTED SIGSTORE PRIVATE KEY' <<< "$COSIGN_PRIVATE_KEY" && [[ -z "${COSIGN_PASSWORD:-}" ]]; then
-            echo "Encrypted cosign key detected but COSIGN_PASSWORD is not set; skipping image signing"
-            exit 0
-          fi
-
-          jq -r '.tags[]' <<< "$METADATA_JSON" | while IFS= read -r tag; do
-            [[ -n "$tag" ]] || continue
-            echo "Signing $tag"
-            cosign sign -y --key env://COSIGN_PRIVATE_KEY "$tag"
-          done
+            echo "SIGNING_SECRET is not set; skipping image signing
