@@ -139,4 +139,22 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${COSIGN_PRIVATE_KEY:-}" ]]; then
-            echo "SIGNING_SECRET is not set; skipping image signing
+            echo "SIGNING_SECRET is not set; skipping image signing"
+            exit 0
+          fi
+
+          if grep -q 'BEGIN ENCRYPTED SIGSTORE PRIVATE KEY' <<< "${COSIGN_PRIVATE_KEY}" && [[ -z "${COSIGN_PASSWORD:-}" ]]; then
+            echo "Encrypted cosign key detected but COSIGN_PASSWORD is not set; skipping image signing"
+            exit 0
+          fi
+
+          # Write key to temp file to avoid shell quoting issues with multiline secrets
+          KEY_FILE=$(mktemp)
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s' "${COSIGN_PRIVATE_KEY}" > "$KEY_FILE"
+
+          jq -r '.tags[]' <<< "${METADATA_JSON}" | while IFS= read -r tag; do
+            [[ -n "$tag" ]] || continue
+            echo "Signing $tag"
+            cosign sign -y --key "$KEY_FILE" "$tag"
+          done

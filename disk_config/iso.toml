@@ -1,4 +1,3 @@
-# Keep installer config Fedora-family. Branding comes from the image itself.
 [customizations.installer.kickstart]
 contents = """
 %post
