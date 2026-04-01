@@ -1,3 +1,5 @@
+# Omenite GNOME anaconda ISO config
+
 [customizations.installer.kickstart]
 contents = """
 %post
@@ -17,3 +19,6 @@ enable = [
   "org.fedoraproject.Anaconda.Modules.Timezone"
 ]
 disable = []
+
+[customizations.iso]
+volume_id = "Omenite-GNOME"

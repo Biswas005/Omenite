@@ -88,7 +88,7 @@ jobs:
           image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
           chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
           types: ${{ matrix.disk-type }}
-          additional-args: --use-librepo=True --rootfs xfs --skip-broken-repos
+          rootfs: xfs
 
       - name: Upload disk images and checksum to job artifacts
         if: inputs.upload-to-s3 != true && github.event_name != 'pull_request'

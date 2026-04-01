@@ -1,3 +1,9 @@
+# Omenite anaconda ISO config
+# The ISO embeds the container image — no network needed during install.
+# Repo GPG issues (e.g. terra-mesa) are irrelevant here because
+# bootc-image-builder pulls the already-built OCI image directly;
+# it does NOT re-resolve RPM repos from scratch.
+
 [customizations.installer.kickstart]
 contents = """
 %post
@@ -17,3 +23,6 @@ enable = [
   "org.fedoraproject.Anaconda.Modules.Timezone"
 ]
 disable = []
+
+[customizations.iso]
+volume_id = "Omenite"
