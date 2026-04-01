@@ -7,8 +7,7 @@ KDIR="/usr/src/kernels/${KERNEL_VERSION}"
 BUILD_DIR="/tmp/hp-wmi-build"
 SIGN_DIR="/etc/pki/module-signing"
 
-# On Bazzite, do not force-install NVIDIA packages here.
-# If you want NVIDIA baked in, use a Bazzite NVIDIA base image instead.
+# Do not install NVIDIA RPMs here; the selected Bazzite base already includes NVIDIA integration.
 dnf5 install -y \
   akmods \
   elfutils-libelf-devel \
@@ -26,10 +25,10 @@ dnf5 install -y \
   vim-enhanced
 
 mkdir -p /usr/lib/bootc/install
-cat > /usr/lib/bootc/install/00-omenite.toml <<'EOF'
+cat > /usr/lib/bootc/install/00-omenite.toml <<'EOT'
 [install.filesystem.root]
 type = "xfs"
-EOF
+EOT
 
 mkdir -p /usr/share/pixmaps /usr/share/icons/hicolor/scalable/apps
 install -m 0644 /ctx/assets/omenite-logo.png /usr/share/pixmaps/omenite-logo.png
@@ -50,10 +49,10 @@ if [ -f /usr/lib/os-release ]; then
 fi
 
 mkdir -p /etc/issue.d
-cat > /etc/issue.d/10-omenite.issue <<'EOF'
+cat > /etc/issue.d/10-omenite.issue <<'EOT'
 Omenite Linux
 Custom Bazzite GNOME-based atomic image for HP Omen systems.
-EOF
+EOT
 
 mkdir -p "${SIGN_DIR}"
 if [ -f /ctx/build_files/module-signing.key ] && \
@@ -85,7 +84,7 @@ rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 cp /ctx/build_files/hp-wmi.c "${BUILD_DIR}/"
 
-cat > "${BUILD_DIR}/Makefile" <<EOF
+cat > "${BUILD_DIR}/Makefile" <<EOT
 obj-m += hp-wmi.o
 
 all:
@@ -93,7 +92,7 @@ all:
 
 clean:
 	\$(MAKE) -C ${KDIR} M=\$(PWD) clean
-EOF
+EOT
 
 make -C "${KDIR}" M="${BUILD_DIR}" modules
 
@@ -109,17 +108,16 @@ install -m 0644 "${BUILD_DIR}/hp-wmi.ko" "/usr/lib/modules/${KERNEL_VERSION}/ext
 depmod -a "${KERNEL_VERSION}"
 
 mkdir -p /etc/modules-load.d /etc/modprobe.d
-
-cat > /etc/modules-load.d/hp-wmi.conf <<'EOF'
+cat > /etc/modules-load.d/hp-wmi.conf <<'EOT'
 hp-wmi
-EOF
+EOT
 
-cat > /etc/modprobe.d/omenite-hp-wmi.conf <<'EOF'
+cat > /etc/modprobe.d/omenite-hp-wmi.conf <<'EOT'
 # Prefer the custom Omenite hp-wmi module from /usr/lib/modules/*/extra.
-EOF
+EOT
 
 mkdir -p /usr/share/ublue-os/just
-cat > /usr/share/ublue-os/just/60-omenite.just <<'EOF'
+cat > /usr/share/ublue-os/just/60-omenite.just <<'EOT'
 enroll-omenite-mok:
 	#!/usr/bin/bash
 	set -euo pipefail
@@ -136,6 +134,6 @@ test-omenite-hp-wmi:
 	sudo modprobe -r hp-wmi || true
 	sudo modprobe hp-wmi
 	modinfo hp-wmi | sed -n '1,20p'
-EOF
+EOT
 
 systemctl enable podman.socket

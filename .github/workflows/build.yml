@@ -16,7 +16,7 @@ on:
 
 env:
   IMAGE_DESC: "Omenite Linux — custom Bazzite GNOME-based atomic image for HP Omen systems"
-  IMAGE_KEYWORDS: "bootc,ublue,universal-blue,bazzite,gnome,omen,omenite,hp-wmi"
+  IMAGE_KEYWORDS: "bootc,ublue,universal-blue,bazzite,gnome,nvidia,omen,omenite,hp-wmi"
   IMAGE_LOGO_URL: "https://raw.githubusercontent.com/${{ github.repository }}/main/assets/omenite-logo.png"
   IMAGE_NAME: "omenite"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
@@ -46,6 +46,8 @@ jobs:
 
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
+        with:
+          remove-codeql: true
 
       - name: Get current date
         id: date
@@ -126,13 +128,24 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
           METADATA_JSON: ${{ steps.metadata.outputs.json }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${COSIGN_PRIVATE_KEY:-}" || { echo 'SIGNING_SECRET is empty'; exit 1; }
+
+          if [[ -z "${COSIGN_PRIVATE_KEY:-}" ]]; then
+            echo "SIGNING_SECRET is not set; skipping image signing"
+            exit 0
+          fi
+
+          if grep -q 'BEGIN ENCRYPTED SIGSTORE PRIVATE KEY' <<< "$COSIGN_PRIVATE_KEY" && [[ -z "${COSIGN_PASSWORD:-}" ]]; then
+            echo "Encrypted cosign key detected but COSIGN_PASSWORD is not set; skipping image signing"
+            exit 0
+          fi
+
           jq -r '.tags[]' <<< "$METADATA_JSON" | while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
+            [[ -n "$tag" ]] || continue
             echo "Signing $tag"
             cosign sign -y --key env://COSIGN_PRIVATE_KEY "$tag"
           done

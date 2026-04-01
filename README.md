@@ -4,7 +4,7 @@ Omenite is a custom Bazzite GNOME-based atomic / Bazzite GNOME-derived image for
 
 ## What is included
 
-- Bazzite GNOME-based atomic image build
+- Bazzite GNOME NVIDIA-based atomic image build
 - Custom HP Omen `hp-wmi` module compiled into the image
 - Omenite branding and logo assets
 - GitHub Actions for OCI image, QCOW2, and Anaconda ISO builds
@@ -19,9 +19,10 @@ Omenite is a custom Bazzite GNOME-based atomic / Bazzite GNOME-derived image for
 
 ## GitHub secrets
 
-Required:
+Optional but recommended for image signing:
 
 - `SIGNING_SECRET` — cosign private key for signing published container images
+- `COSIGN_PASSWORD` — only needed if `SIGNING_SECRET` contains an encrypted cosign key
 
 Optional for persistent Secure Boot signing of the custom module:
 
@@ -40,3 +41,8 @@ The disk-image workflow expects the container image to be published first, then 
 
 The Anaconda ISO configuration lives at `disk_config/iso.toml` only.
 The installer UI has Storage, Network, Security, Services, Users, Subscription, and Timezone modules enabled.
+
+
+## Default base image
+
+The repo now defaults to `ghcr.io/ublue-os/bazzite-gnome-nvidia:stable`, so NVIDIA support comes from the base image rather than manual RPM layering in `build.sh`.
