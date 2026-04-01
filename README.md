@@ -46,3 +46,8 @@ The installer UI has Storage, Network, Security, Services, Users, Subscription, 
 ## Default base image
 
 The repo now defaults to `ghcr.io/ublue-os/bazzite-gnome-nvidia:stable`, so NVIDIA support comes from the base image rather than manual RPM layering in `build.sh`.
+
+
+## Branding note
+
+Omenite keeps Fedora/Bazzite machine-readable `os-release` identity needed by `bootc-image-builder` for Anaconda artifacts, while overriding human-facing branding such as `NAME`, `PRETTY_NAME`, `VARIANT`, `LOGO`, installer product text, and logo assets.
