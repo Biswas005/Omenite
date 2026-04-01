@@ -1,14 +1,26 @@
+# Stage to copy build files
 FROM scratch AS ctx
-COPY build_files /ctx/build_files
-COPY assets /ctx/assets
+COPY build_files /
 
+# Base Image
 FROM ghcr.io/ublue-os/bazzite-gnome-nvidia:stable
 
-ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite-gnome-nvidia:stable
-ENV BASE_IMAGE=${BASE_IMAGE}
+# Build arguments for module signing secrets
+ARG module_signing_key
+ARG module_signing_crt  
+ARG module_signing_der
 
-RUN --mount=type=bind,from=ctx,source=/ctx,target=/ctx \
+# Create temporary directory for secrets and decode them
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
-    /usr/bin/bash /ctx/build_files/build.sh
+    mkdir -p /tmp/secrets && \
+    echo "$module_signing_key" | base64 -d > /tmp/secrets/module-signing.key && \
+    echo "$module_signing_crt" | base64 -d > /tmp/secrets/module-signing.crt && \
+    echo "$module_signing_der" | base64 -d > /tmp/secrets/module-signing.der && \
+    /ctx/build.sh && \
+    rm -rf /tmp/secrets && \
+    ostree container commit
+
+RUN bootc container lint
