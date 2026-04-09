@@ -383,17 +383,17 @@ dnf5 install -y firefox
 
 # Install Brave Browser
 # Add Brave repo (dnf5-compatible way)
-echo "Adding Brave browser repository..."
-cat > /etc/yum.repos.d/terra.repo << 'BRAVE_REPO_EOF'
-[Brave]
-name=Brave Browser
-baseurl=https://brave-browser-rpm-release.s3.brave.com/x86_64
-enabled=1
-gpgcheck=1
-gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-BRAVE_REPO_EOF
+# echo "Adding Brave browser repository..."
+# cat > /etc/yum.repos.d/terra.repo << 'BRAVE_REPO_EOF'
+# [Brave]
+# name=Brave Browser
+# baseurl=https://brave-browser-rpm-release.s3.brave.com/x86_64
+# enabled=1
+# gpgcheck=1
+# gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+# BRAVE_REPO_EOF
 
-dnf5 install -y brave-browser
+# dnf5 install -y brave-browser
 
 
 # Replace power-profiles-daemon → TLP (better battery tuning on laptops like Omen)
