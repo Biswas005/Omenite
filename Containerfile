@@ -23,4 +23,19 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     rm -rf /tmp/secrets && \
     ostree container commit
 
+# Override OS branding to Omenite
+RUN sed -i 's/^NAME=.*/NAME="Omenite"/' /etc/os-release && \
+    sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Omenite Linux"/' /etc/os-release && \
+    sed -i 's/^VARIANT=.*/VARIANT="Omenite"/' /etc/os-release && \
+    sed -i 's|^LOGO=.*|LOGO=/usr/share/icons/hicolor/scalable/apps/omenite-logo.svg|' /etc/os-release
+
+# Copy Omenite logo to system locations
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    cp /ctx/assets/omenite-logo.png /usr/share/icons/hicolor/scalable/apps/ && \
+    cp /ctx/assets/omenite-logo.svg /usr/share/icons/hicolor/scalable/apps/ && \
+    # Also copy to plymouth theme if it exists
+    if [ -d /usr/share/plymouth/themes/bazzite ]; then \
+        cp /ctx/assets/omenite-logo.png /usr/share/plymouth/themes/bazzite/logo.png || true; \
+    fi
+
 RUN bootc container lint
