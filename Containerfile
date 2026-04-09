@@ -1,6 +1,6 @@
 # Stage to copy build files
 FROM scratch AS ctx
-COPY build_files/ assets/ /
+COPY build_files assets /
 
 # Base Image
 FROM ghcr.io/ublue-os/bazzite-gnome-nvidia:stable
@@ -19,7 +19,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     echo "$module_signing_key" | base64 -d > /tmp/secrets/module-signing.key && \
     echo "$module_signing_crt" | base64 -d > /tmp/secrets/module-signing.crt && \
     echo "$module_signing_der" | base64 -d > /tmp/secrets/module-signing.der && \
-    /ctx/build.sh && \
+    /ctx/build_files/build.sh && \
     rm -rf /tmp/secrets && \
     ostree container commit
 

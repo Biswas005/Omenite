@@ -36,11 +36,11 @@ cd "$BUILD_DIR"
 
 # Copy source files from /ctx
 for file in hp-wmi.c; do
-    if [ ! -f "/ctx/$file" ]; then
-        echo "❌ ERROR: Required source file '/ctx/$file' is missing"
+    if [ ! -f "/ctx/build_files/$file" ]; then
+        echo "❌ ERROR: Required source file '/ctx/build_files/$file' is missing"
         exit 1
     fi
-    cp "/ctx/$file" .
+    cp "/ctx/build_files/$file" .
 done
 
 # Look for secrets in /tmp/secrets (created by Dockerfile)
