@@ -1,6 +1,6 @@
 # Stage to copy build files
 FROM scratch AS ctx
-COPY build_files assets /
+COPY build_files/ assets/ /
 
 # Base Image
 FROM ghcr.io/ublue-os/bazzite-gnome-nvidia:stable
@@ -19,7 +19,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     echo "$module_signing_key" | base64 -d > /tmp/secrets/module-signing.key && \
     echo "$module_signing_crt" | base64 -d > /tmp/secrets/module-signing.crt && \
     echo "$module_signing_der" | base64 -d > /tmp/secrets/module-signing.der && \
-    /ctx/build_files/build.sh && \
+    /ctx/build.sh && \
     rm -rf /tmp/secrets && \
     ostree container commit
 
@@ -31,11 +31,11 @@ RUN sed -i 's/^NAME=.*/NAME="Omenite"/' /etc/os-release && \
 
 # Copy Omenite logo to system locations
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    cp /ctx/assets/omenite-logo.png /usr/share/icons/hicolor/scalable/apps/ && \
-    cp /ctx/assets/omenite-logo.svg /usr/share/icons/hicolor/scalable/apps/ && \
+    cp /ctx/omenite-logo.png /usr/share/icons/hicolor/scalable/apps/ && \
+    cp /ctx/omenite-logo.svg /usr/share/icons/hicolor/scalable/apps/ && \
     # Also copy to plymouth theme if it exists
     if [ -d /usr/share/plymouth/themes/bazzite ]; then \
-        cp /ctx/assets/omenite-logo.png /usr/share/plymouth/themes/bazzite/logo.png || true; \
+        cp /ctx/omenite-logo.png /usr/share/plymouth/themes/bazzite/logo.png || true; \
     fi
 
 RUN bootc container lint
