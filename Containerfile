@@ -1,6 +1,6 @@
 # Stage to copy build files
 FROM scratch AS ctx
-COPY build_files /
+COPY build_files/ assets/ /
 
 # Base Image
 FROM ghcr.io/ublue-os/bazzite-gnome-nvidia:stable
