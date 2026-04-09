@@ -383,6 +383,8 @@ dnf5 install -y firefox
 
 # Install Brave Browser
 # Add Brave repo (dnf5-compatible way)
+mkdir -p /opt
+mkdir -p /opt /var/opt
 curl -fsSLo /etc/yum.repos.d/brave-browser.repo \
 https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
 
