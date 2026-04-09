@@ -382,11 +382,9 @@ echo "Visual Studio Code installed successfully!"
 dnf5 install -y firefox
 
 # Install Brave Browser
-dnf5 install -y dnf-plugins-core
+run0 curl -fsSLo /etc/yum.repos.d/brave-browser.repo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
 
-dnf5 config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
-
-dnf5 install -y brave-browser
+run0 rpm-ostree install brave-browser
 
 
 # Replace power-profiles-daemon → TLP (better battery tuning on laptops like Omen)
