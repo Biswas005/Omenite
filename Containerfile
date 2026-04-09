@@ -21,10 +21,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     echo "$module_signing_der" | base64 -d > /tmp/secrets/module-signing.der && \
     /ctx/build.sh && \
     rm -rf /tmp/secrets && \
-    ostree container commit \
-        --branch omenite \
-        --metadata "com.github.containers.bootc=1" \
-        --metadata "version=stable"
+    ostree container commit
 
 # Override OS branding to Omenite
 RUN sed -i 's/^NAME=.*/NAME="Omenite"/' /etc/os-release && \
