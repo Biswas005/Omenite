@@ -383,15 +383,16 @@ dnf5 install -y firefox
 
 # Install Brave Browser
 # Add Brave repo (dnf5-compatible way)
-mkdir -p /opt
-mkdir -p /opt /var/opt
-curl -fsSLo /etc/yum.repos.d/brave-browser.repo \
-https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+echo "Adding Brave browser repository..."
+cat > /etc/yum.repos.d/terra.repo << 'BRAVE_REPO_EOF'
+[Brave]
+name=Brave Browser
+baseurl=https://brave-browser-rpm-release.s3.brave.com/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+BRAVE_REPO_EOF
 
-# Import GPG key (important for rpm-ostree)
-rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-
-# Install Brave
 dnf5 install -y brave-browser
 
 
