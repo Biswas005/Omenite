@@ -379,35 +379,7 @@ echo "Visual Studio Code installed successfully!"
 
 # Install firefox Browser
 ########################
-dnf5 install -y firefox
-
-# Install Brave Browser
-# Add Brave repo (dnf5-compatible way)
-# echo "Adding Brave browser repository..."
-# cat > /etc/yum.repos.d/terra.repo << 'BRAVE_REPO_EOF'
-# [Brave]
-# name=Brave Browser
-# baseurl=https://brave-browser-rpm-release.s3.brave.com/x86_64
-# enabled=1
-# gpgcheck=1
-# gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-# BRAVE_REPO_EOF
-
-# dnf5 install -y brave-browser
-
-
-# Replace power-profiles-daemon → TLP (better battery tuning on laptops like Omen)
-dnf5  remove -y tuned tuned-ppd  power-profiles-daemon
-
-dnf5 -y install https://repo.linrunner.de/fedora/tlp/repos/releases/tlp-release.fc$(rpm -E %fedora).noarch.rpm
-dnf5 install -y tlp tlp-pd tlp-rdw
-rpm-ostree install toolbox
-    # Optional but recommended for full power-profilesctl compatibility (GNOME/KDE/Steam Deck UI):
-    # tlp-pd    # ← only if available in Fedora repos by your build time (check later)
-
-# Mask the old service so nothing accidentally starts it
-# (this survives ostree upgrades)
-systemctl mask power-profiles-daemon.service || true
+# dnf5 install -y firefox
 
 
 # Enable services
@@ -616,8 +588,7 @@ elif [ "$NVIDIA_INSTALLED" = true ]; then
 else
     echo "   ⚠️  NVIDIA drivers (installation failed)"
 fi
-echo "   ✓ Rust programming language"
-echo "   ✓ Brave browser (Firefox removed)"
+echo "   ✓ Rust programming language"  
 echo "   ✓ Visual Studio Code"
 if [ "$NVIDIA_INSTALLED" = true ] || [ "$NVIDIA_BASE" = true ]; then
     echo "   ✓ CUDA development tools"
