@@ -90,7 +90,7 @@ setup_github_secrets_keys() {
 # 🔧 Invoke the secrets setup
 setup_github_secrets_keys || exit 1
 
-# Install base packages
+# Install base packages (always needed)
 echo "Installing build dependencies..."
 dnf5 install -y kernel-devel kernel-headers gcc make kmod openssl mokutil elfutils-libelf-devel tmux
 
@@ -113,11 +113,14 @@ else
 
         BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
+        # Generate RSA private key
         openssl genpkey -algorithm RSA -out module-signing.key -pkeyopt rsa_keygen_bits:2048
 
+        # Generate X.509 certificate with timestamp to indicate temporary nature
         openssl req -new -x509 -key module-signing.key -out module-signing.crt -days 3650 \
             -subj "/CN=Bazzite Omen Module Signer TEMP-${BUILD_TIMESTAMP}/"
 
+        # Convert certificate to DER format for MOK enrollment
         openssl x509 -in module-signing.crt -outform DER -out module-signing.der
 
         chmod 600 module-signing.key
@@ -135,6 +138,7 @@ echo "Fingerprint: $(openssl x509 -in /etc/pki/module-signing/module-signing.crt
 # Build Custom HP-WMI Module
 #############################
 
+# Return to build directory
 cd "$BUILD_DIR"
 
 cat > Makefile << 'MAKEFILE_EOF'
@@ -224,13 +228,8 @@ rm -rf "$BUILD_DIR"
 
 echo "hp-wmi module installation completed successfully!"
 
-# Securely delete private key files after use
+# Securely delete only the private key files after use
 echo "🧹 Cleaning up private key files..."
-
-if [ -f "$BUILD_DIR/module-signing.key" ]; then
-    shred -u "$BUILD_DIR/module-signing.key" || rm -f "$BUILD_DIR/module-signing.key"
-    echo "✅ Deleted build directory private key securely."
-fi
 
 if [ -f "/tmp/secrets/module-signing.key" ]; then
     shred -u "/tmp/secrets/module-signing.key" || rm -f "/tmp/secrets/module-signing.key"
@@ -260,17 +259,7 @@ VSCODE_REPO_EOF
 dnf5 install -y code
 echo "Visual Studio Code installed successfully!"
 
-# Install Firefox
-dnf5 install -y firefox
-
-# Replace power-profiles-daemon → TLP
-dnf5 remove -y tuned tuned-ppd power-profiles-daemon
-
-dnf5 -y install https://repo.linrunner.de/fedora/tlp/repos/releases/tlp-release.fc$(rpm -E %fedora).noarch.rpm
-dnf5 install -y tlp tlp-pd tlp-rdw
 rpm-ostree install toolbox
-
-systemctl mask power-profiles-daemon.service || true
 
 # Enable services
 systemctl enable podman.socket
@@ -452,8 +441,8 @@ echo "   ujust help-hp-wmi-mok"
 echo ""
 echo "6. Software installed:"
 echo "   ✓ HP-WMI custom module (signed)"
-echo "   ✓ Firefox"
 echo "   ✓ Visual Studio Code"
+echo "   ✓ toolbox"
 echo ""
 if [ "$USING_PERSISTENT_KEYS" = false ]; then
     echo "⚠️  IMPORTANT: Consider setting up persistent key management"
@@ -468,7 +457,6 @@ echo "🧹 Removing third-party repo files..."
 rm -f /etc/yum.repos.d/terra-mesa.repo
 rm -f /etc/yum.repos.d/terra.repo
 rm -f /etc/yum.repos.d/vscode.repo
-rm -f /etc/yum.repos.d/tlp.repo
 rm -f /etc/yum.repos.d/_copr*.repo
 
 for repo in /etc/yum.repos.d/*.repo; do
