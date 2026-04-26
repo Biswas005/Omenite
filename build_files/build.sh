@@ -259,6 +259,9 @@ VSCODE_REPO_EOF
 dnf5 install -y code
 echo "Visual Studio Code installed successfully!"
 
+# Install NVIDIA Container Toolkit
+dnf5 install -y nvidia-container-toolkit
+
 rpm-ostree install toolbox
 
 # Enable services
@@ -442,6 +445,7 @@ echo ""
 echo "6. Software installed:"
 echo "   ✓ HP-WMI custom module (signed)"
 echo "   ✓ Visual Studio Code"
+echo "   ✓ NVIDIA Container Toolkit"
 echo "   ✓ toolbox"
 echo ""
 if [ "$USING_PERSISTENT_KEYS" = false ]; then
@@ -457,6 +461,7 @@ echo "🧹 Removing third-party repo files..."
 rm -f /etc/yum.repos.d/terra-mesa.repo
 rm -f /etc/yum.repos.d/terra.repo
 rm -f /etc/yum.repos.d/vscode.repo
+rm -f /etc/yum.repos.d/nvidia-container-toolkit.repo
 rm -f /etc/yum.repos.d/_copr*.repo
 
 for repo in /etc/yum.repos.d/*.repo; do
