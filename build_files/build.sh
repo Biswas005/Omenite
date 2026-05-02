@@ -259,6 +259,52 @@ VSCODE_REPO_EOF
 dnf5 install -y code
 echo "Visual Studio Code installed successfully!"
 
+# Install NVIDIA drivers via akmods
+echo "Installing NVIDIA drivers via akmods..."
+dnf5 install -y akmod-nvidia xorg-x11-drv-nvidia-cuda
+
+# Force akmods to build NVIDIA modules for current kernel
+echo "Running akmods to build NVIDIA modules..."
+akmods --force
+depmod -a "$KERNEL_VERSION"
+
+# Sign NVIDIA modules with persistent keys
+echo "Signing NVIDIA modules..."
+NVIDIA_SEARCH_PATHS=(
+    "/lib/modules/$KERNEL_VERSION/extra/nvidia"
+    "/lib/modules/$KERNEL_VERSION/kernel/drivers/video"
+    "/lib/modules/$KERNEL_VERSION/weak-updates/nvidia"
+    "/usr/lib/modules/$KERNEL_VERSION/extra/nvidia"
+)
+
+for search_path in "${NVIDIA_SEARCH_PATHS[@]}"; do
+    if [ -d "$search_path" ]; then
+        echo "Found NVIDIA modules in: $search_path"
+        for ko_file in $(find "$search_path" -name "*.ko" 2>/dev/null); do
+            echo "Signing: $(basename $ko_file)"
+            if [ -f "$KERNEL_SRC_DIR/scripts/sign-file" ]; then
+                $KERNEL_SRC_DIR/scripts/sign-file sha256 \
+                    /etc/pki/module-signing/module-signing.key \
+                    /etc/pki/module-signing/module-signing.crt \
+                    "$ko_file"
+            fi
+        done
+    fi
+done
+
+for ko_file in $(find /lib/modules/$KERNEL_VERSION -name "nvidia.ko" 2>/dev/null); do
+    echo "Signing: $(basename $ko_file)"
+    if [ -f "$KERNEL_SRC_DIR/scripts/sign-file" ]; then
+        $KERNEL_SRC_DIR/scripts/sign-file sha256 \
+            /etc/pki/module-signing/module-signing.key \
+            /etc/pki/module-signing/module-signing.crt \
+            "$ko_file"
+    fi
+done
+
+depmod -a "$KERNEL_VERSION"
+echo "✅ NVIDIA drivers installed and modules signed"
+
 # Install NVIDIA Container Toolkit
 dnf5 install -y nvidia-container-toolkit
 
@@ -445,6 +491,7 @@ echo ""
 echo "6. Software installed:"
 echo "   ✓ HP-WMI custom module (signed)"
 echo "   ✓ Visual Studio Code"
+echo "   ✓ NVIDIA drivers via akmods (595.x, signed)"
 echo "   ✓ NVIDIA Container Toolkit"
 echo "   ✓ toolbox"
 echo ""
