@@ -4,6 +4,18 @@ set -ouex pipefail
 echo "🚀 Build script starting..."
 echo "📦 Base image: ${BASE_IMAGE:-unknown}"
 
+# Check if we're building on a NVIDIA-enabled base image
+NVIDIA_BASE=false
+NVIDIA_INSTALLED=false  # Initialize the variable
+
+if [[ "${BASE_IMAGE:-}" == *"nvidia"* ]]; then
+    NVIDIA_BASE=true
+    NVIDIA_INSTALLED=true  # Set to true if using NVIDIA base
+    echo "🟢 NVIDIA base image detected — skipping NVIDIA driver installation"
+else
+    echo "🟡 Regular base image detected — NVIDIA drivers will be installed"
+fi
+
 # Detect and verify kernel version
 KERNEL_VERSION=$(rpm -q kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')
 echo "🧠 Detected kernel version: $KERNEL_VERSION"
@@ -39,6 +51,7 @@ if [ -f "$SECRET_PATH/module-signing.key" ] && \
 
     echo "✅ Found decoded secrets in $SECRET_PATH"
 
+    # Copy the already decoded files
     cp "$SECRET_PATH/module-signing.key" .
     cp "$SECRET_PATH/module-signing.crt" .
     cp "$SECRET_PATH/module-signing.der" .
@@ -68,6 +81,7 @@ echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/"
 setup_github_secrets_keys() {
     echo "🔐 Validating module signing keys in /etc/pki/module-signing/..."
 
+    # Check all required decoded files exist in final location
     SIGNING_DIR="/etc/pki/module-signing"
 
     for file in module-signing.key module-signing.crt module-signing.der; do
@@ -79,6 +93,7 @@ setup_github_secrets_keys() {
         fi
     done
 
+    # Verify permissions are correct
     if [ ! -r "$SIGNING_DIR/module-signing.key" ]; then
         echo "❌ ERROR: module-signing.key is not readable"
         exit 1
@@ -94,6 +109,18 @@ setup_github_secrets_keys || exit 1
 echo "Installing build dependencies..."
 dnf5 install -y kernel-devel kernel-headers gcc make kmod openssl mokutil elfutils-libelf-devel tmux
 
+# Install NVIDIA drivers if not using NVIDIA base
+if [ "$NVIDIA_BASE" = false ]; then
+    echo "Installing NVIDIA drivers via akmods..."
+    if dnf5 install -y akmod-nvidia xorg-x11-drv-nvidia-cuda; then
+        NVIDIA_INSTALLED=true
+        echo "✅ NVIDIA drivers installed successfully"
+    else
+        echo "❌ NVIDIA driver installation failed"
+        NVIDIA_INSTALLED=false
+    fi
+fi
+
 # Persistent Key Management
 ############################
 
@@ -106,27 +133,29 @@ else
     echo "⚠️  Using temporary keys - users will need to re-enroll MOK after each update"
     USING_PERSISTENT_KEYS=false
 
-    if [ ! -f "/etc/pki/module-signing/module-signing.key" ]; then
-        echo "Generating temporary module signing keys..."
-        mkdir -p /etc/pki/module-signing/
-        cd /etc/pki/module-signing/
+    # Generate temporary keys if persistent keys not available  
+    if [ ! -f "/etc/pki/module-signing/module-signing.key" ]; then  
+        echo "Generating temporary module signing keys..."  
+        mkdir -p /etc/pki/module-signing/  
+        cd /etc/pki/module-signing/  
 
-        BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)  
 
-        # Generate RSA private key
-        openssl genpkey -algorithm RSA -out module-signing.key -pkeyopt rsa_keygen_bits:2048
+        # Generate RSA private key  
+        openssl genpkey -algorithm RSA -out module-signing.key -pkeyopt rsa_keygen_bits:2048  
 
-        # Generate X.509 certificate with timestamp to indicate temporary nature
+        # Generate X.509 certificate with timestamp to indicate temporary nature  
         openssl req -new -x509 -key module-signing.key -out module-signing.crt -days 3650 \
-            -subj "/CN=Bazzite Omen Module Signer TEMP-${BUILD_TIMESTAMP}/"
+            -subj "/CN=Bazzite Omen Module Signer TEMP-${BUILD_TIMESTAMP}/"  
 
-        # Convert certificate to DER format for MOK enrollment
-        openssl x509 -in module-signing.crt -outform DER -out module-signing.der
+        # Convert certificate to DER format for MOK enrollment  
+        openssl x509 -in module-signing.crt -outform DER -out module-signing.der  
 
-        chmod 600 module-signing.key
-        chmod 644 module-signing.crt module-signing.der
+        # Set proper permissions  
+        chmod 600 module-signing.key  
+        chmod 644 module-signing.crt module-signing.der  
 
-        echo "Generated temporary signing keys in PEM and DER formats"
+        echo "Generated temporary signing keys in PEM and DER formats"  
     fi
 fi
 
@@ -141,6 +170,7 @@ echo "Fingerprint: $(openssl x509 -in /etc/pki/module-signing/module-signing.crt
 # Return to build directory
 cd "$BUILD_DIR"
 
+# Create Makefile with proper heredoc syntax
 cat > Makefile << 'MAKEFILE_EOF'
 obj-m += hp-wmi.o
 
@@ -153,8 +183,10 @@ clean:
 .PHONY: default clean
 MAKEFILE_EOF
 
+# Set the KDIR variable for the make command
 export KDIR="$KERNEL_SRC_DIR"
 
+# Build the module
 echo "Building hp-wmi kernel module..."
 echo "Using KDIR: $KDIR"
 if ! make KDIR="$KERNEL_SRC_DIR"; then
@@ -167,6 +199,7 @@ if ! make KDIR="$KERNEL_SRC_DIR"; then
     exit 1
 fi
 
+# Verify build success
 if [ ! -f "hp-wmi.ko" ]; then
     echo "ERROR: hp-wmi.ko not found after build"
     echo "Files in build directory:"
@@ -188,10 +221,11 @@ fi
 
 echo "Successfully built hp-wmi.ko"
 
-# Install the module
+# Create backup and replace existing modules
 echo "Installing hp-wmi kernel module..."
 MODULE_INSTALLED=false
 
+# Find and replace existing hp-wmi modules
 for module_path in $(find /lib/modules -name "hp-wmi.ko*" 2>/dev/null); do
     echo "Backing up existing module: $module_path"
     cp "$module_path" "$module_path.backup"
@@ -200,6 +234,7 @@ for module_path in $(find /lib/modules -name "hp-wmi.ko*" 2>/dev/null); do
     MODULE_INSTALLED=true
 done
 
+# If no existing modules found, install to extra directory
 if [ "$MODULE_INSTALLED" = false ]; then
     EXTRA_DIR="/lib/modules/$KERNEL_VERSION/extra"
     mkdir -p "$EXTRA_DIR"
@@ -207,15 +242,18 @@ if [ "$MODULE_INSTALLED" = false ]; then
     echo "Installed hp-wmi.ko to $EXTRA_DIR/"
 fi
 
+# Update module dependencies
 echo "Updating module dependencies..."
 depmod -a "$KERNEL_VERSION"
 
+# Create module loading configuration
 echo "Creating module configuration..."
 cat > /etc/modules-load.d/hp-wmi.conf << 'MODULE_CONF_EOF'
 # Load HP WMI module at boot
 hp-wmi
 MODULE_CONF_EOF
 
+# Create modprobe configuration if needed
 cat > /etc/modprobe.d/hp-wmi.conf << 'MODPROBE_CONF_EOF'
 # HP WMI module configuration
 # Add any module parameters here if needed
@@ -231,6 +269,16 @@ echo "hp-wmi module installation completed successfully!"
 # Securely delete only the private key files after use
 echo "🧹 Cleaning up private key files..."
 
+# Clean up build directory private key
+if [ -f "$BUILD_DIR/module-signing.key" ]; then
+    shred -u "$BUILD_DIR/module-signing.key" || rm -f "$BUILD_DIR/module-signing.key"
+    echo "✅ Deleted build directory private key securely."
+else
+    echo "⚠️ No private key file found in build directory."
+fi
+
+# Clean up any remaining private key in /tmp/secrets (if it still exists)
+# Note: This should already be cleaned up by the Dockerfile, but just in case
 if [ -f "/tmp/secrets/module-signing.key" ]; then
     shred -u "/tmp/secrets/module-signing.key" || rm -f "/tmp/secrets/module-signing.key"
     echo "✅ Deleted /tmp/secrets private key securely."
@@ -238,6 +286,76 @@ fi
 
 echo "🔒 Private key cleanup completed."
 echo "📋 Certificate files (.crt and .der) preserved for MOK enrollment."
+
+# Conditional NVIDIA Module Building and Signing
+##################################################
+
+if [ "$NVIDIA_INSTALLED" = true ]; then
+    echo "Building and signing NVIDIA modules..."
+
+    # Force akmods to build NVIDIA modules for current kernel
+    echo "Running akmods to build NVIDIA modules..."
+    akmods --force
+
+    # Wait for akmods to complete and update module dependencies
+    depmod -a "$KERNEL_VERSION"
+
+    # Find and sign NVIDIA modules
+    echo "Signing NVIDIA modules with persistent keys..."
+    NVIDIA_MODULES_FOUND=false
+
+    # Common locations for NVIDIA modules
+    NVIDIA_SEARCH_PATHS=(
+        "/lib/modules/$KERNEL_VERSION/extra/nvidia"
+        "/lib/modules/$KERNEL_VERSION/kernel/drivers/video"
+        "/lib/modules/$KERNEL_VERSION/weak-updates/nvidia"
+        "/usr/lib/modules/$KERNEL_VERSION/extra/nvidia"
+    )
+
+    for search_path in "${NVIDIA_SEARCH_PATHS[@]}"; do
+        if [ -d "$search_path" ]; then
+            echo "Found NVIDIA modules in: $search_path"
+            for ko_file in $(find "$search_path" -name "*.ko" 2>/dev/null); do
+                echo "Signing NVIDIA module: $(basename $ko_file)"
+                if [ -f "$KERNEL_SRC_DIR/scripts/sign-file" ]; then
+                    $KERNEL_SRC_DIR/scripts/sign-file sha256 \
+                        /etc/pki/module-signing/module-signing.key \
+                        /etc/pki/module-signing/module-signing.crt \
+                        "$ko_file"
+                    NVIDIA_MODULES_FOUND=true
+                fi
+            done
+        fi
+    done
+
+    # Also check for NVIDIA modules in standard kernel locations
+    for ko_file in $(find /lib/modules/$KERNEL_VERSION -name "nvidia.ko" 2>/dev/null); do
+        echo "Signing NVIDIA module: $(basename $ko_file)"
+        if [ -f "$KERNEL_SRC_DIR/scripts/sign-file" ]; then
+            $KERNEL_SRC_DIR/scripts/sign-file sha256 \
+                /etc/pki/module-signing/module-signing.key \
+                /etc/pki/module-signing/module-signing.crt \
+                "$ko_file"
+            NVIDIA_MODULES_FOUND=true
+        fi
+    done
+
+    if [ "$NVIDIA_MODULES_FOUND" = true ]; then
+        echo "✓ NVIDIA modules signed successfully"
+        # Update module dependencies after signing
+        depmod -a "$KERNEL_VERSION"
+    else
+        echo "⚠️  No NVIDIA modules found to sign. They may be built on first boot."
+    fi
+else
+    if [ "$NVIDIA_BASE" = true ]; then
+        echo "✓ Skipping NVIDIA module building (using NVIDIA base image)"
+    else
+        echo "⚠️  Skipping NVIDIA module building (installation failed)"
+    fi
+fi
+
+dnf5 install -y nvidia-container-toolkit
 
 # Install Visual Studio Code
 ##############################
@@ -259,56 +377,38 @@ VSCODE_REPO_EOF
 dnf5 install -y code
 echo "Visual Studio Code installed successfully!"
 
-# Install NVIDIA drivers via akmods
-echo "Installing NVIDIA drivers via akmods..."
-dnf5 install -y akmod-nvidia xorg-x11-drv-nvidia-cuda
+# Install firefox Browser
+########################
+dnf5 install -y firefox
 
-# Force akmods to build NVIDIA modules for current kernel
-echo "Running akmods to build NVIDIA modules..."
-akmods --force
-depmod -a "$KERNEL_VERSION"
+# Install Brave Browser
+# Add Brave repo (dnf5-compatible way)
+# echo "Adding Brave browser repository..."
+# cat > /etc/yum.repos.d/terra.repo << 'BRAVE_REPO_EOF'
+# [Brave]
+# name=Brave Browser
+# baseurl=https://brave-browser-rpm-release.s3.brave.com/x86_64
+# enabled=1
+# gpgcheck=1
+# gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+# BRAVE_REPO_EOF
 
-# Sign NVIDIA modules with persistent keys
-echo "Signing NVIDIA modules..."
-NVIDIA_SEARCH_PATHS=(
-    "/lib/modules/$KERNEL_VERSION/extra/nvidia"
-    "/lib/modules/$KERNEL_VERSION/kernel/drivers/video"
-    "/lib/modules/$KERNEL_VERSION/weak-updates/nvidia"
-    "/usr/lib/modules/$KERNEL_VERSION/extra/nvidia"
-)
+# dnf5 install -y brave-browser
 
-for search_path in "${NVIDIA_SEARCH_PATHS[@]}"; do
-    if [ -d "$search_path" ]; then
-        echo "Found NVIDIA modules in: $search_path"
-        for ko_file in $(find "$search_path" -name "*.ko" 2>/dev/null); do
-            echo "Signing: $(basename $ko_file)"
-            if [ -f "$KERNEL_SRC_DIR/scripts/sign-file" ]; then
-                $KERNEL_SRC_DIR/scripts/sign-file sha256 \
-                    /etc/pki/module-signing/module-signing.key \
-                    /etc/pki/module-signing/module-signing.crt \
-                    "$ko_file"
-            fi
-        done
-    fi
-done
 
-for ko_file in $(find /lib/modules/$KERNEL_VERSION -name "nvidia.ko" 2>/dev/null); do
-    echo "Signing: $(basename $ko_file)"
-    if [ -f "$KERNEL_SRC_DIR/scripts/sign-file" ]; then
-        $KERNEL_SRC_DIR/scripts/sign-file sha256 \
-            /etc/pki/module-signing/module-signing.key \
-            /etc/pki/module-signing/module-signing.crt \
-            "$ko_file"
-    fi
-done
+# Replace power-profiles-daemon → TLP (better battery tuning on laptops like Omen)
+dnf5  remove -y tuned tuned-ppd  power-profiles-daemon
 
-depmod -a "$KERNEL_VERSION"
-echo "✅ NVIDIA drivers installed and modules signed"
-
-# Install NVIDIA Container Toolkit
-dnf5 install -y nvidia-container-toolkit
-
+dnf5 -y install https://repo.linrunner.de/fedora/tlp/repos/releases/tlp-release.fc$(rpm -E %fedora).noarch.rpm
+dnf5 install -y tlp tlp-pd tlp-rdw
 rpm-ostree install toolbox
+    # Optional but recommended for full power-profilesctl compatibility (GNOME/KDE/Steam Deck UI):
+    # tlp-pd    # ← only if available in Fedora repos by your build time (check later)
+
+# Mask the old service so nothing accidentally starts it
+# (this survives ostree upgrades)
+systemctl mask power-profiles-daemon.service || true
+
 
 # Enable services
 systemctl enable podman.socket
@@ -325,34 +425,34 @@ enroll-hp-wmi-mok:
 #!/usr/bin/bash
 set -euo pipefail
 
-MOK_KEY="/etc/pki/module-signing/module-signing.der"
+MOK_KEY="/etc/pki/module-signing/module-signing.der"  
 
-if [ ! -f "$MOK_KEY" ]; then
-    echo "ERROR: MOK certificate not found at $MOK_KEY"
-    echo "Please ensure the hp-wmi module build script has been run first."
-    exit 1
-fi
+if [ ! -f "$MOK_KEY" ]; then  
+    echo "ERROR: MOK certificate not found at $MOK_KEY"  
+    echo "Please ensure the hp-wmi module build script has been run first."  
+    exit 1  
+fi  
 
-echo "Enrolling HP WMI module signing certificate in MOK database..."
-echo "You will be prompted to set a password for MOK enrollment."
-echo "Remember this password - you'll need it during the next boot."
-echo ""
+echo "Enrolling HP WMI module signing certificate in MOK database..."  
+echo "You will be prompted to set a password for MOK enrollment."  
+echo "Remember this password - you'll need it during the next boot."  
+echo ""  
 
-if sudo mokutil --import "$MOK_KEY"; then
-    echo ""
-    echo "SUCCESS: Certificate enrolled in MOK database."
-    echo ""
-    echo "NEXT STEPS:"
-    echo "1. Reboot your system: sudo systemctl reboot"
-    echo "2. During boot, you'll see a blue MOK Manager screen"
-    echo "3. Select 'Enroll MOK' -> 'Continue' -> 'Yes'"
-    echo "4. Enter the password you just set"
-    echo "5. Select 'Reboot'"
-    echo ""
-    echo "After reboot, your custom hp-wmi module will load without issues."
-else
-    echo "ERROR: Failed to enroll certificate"
-    exit 1
+if sudo mokutil --import "$MOK_KEY"; then  
+    echo ""  
+    echo "SUCCESS: Certificate enrolled in MOK database."  
+    echo ""  
+    echo "NEXT STEPS:"  
+    echo "1. Reboot your system: sudo systemctl reboot"  
+    echo "2. During boot, you'll see a blue MOK Manager screen"  
+    echo "3. Select 'Enroll MOK' -> 'Continue' -> 'Yes'"  
+    echo "4. Enter the password you just set"  
+    echo "5. Select 'Reboot'"  
+    echo ""  
+    echo "After reboot, your custom hp-wmi module will load without issues."  
+else  
+    echo "ERROR: Failed to enroll certificate"  
+    exit 1  
 fi
 
 # Check MOK enrollment status
@@ -360,21 +460,21 @@ check-hp-wmi-mok:
 #!/usr/bin/bash
 set -euo pipefail
 
-echo "Checking MOK database for HP WMI certificate..."
+echo "Checking MOK database for HP WMI certificate..."  
 
-if mokutil --list-enrolled | grep -q "Bazzite Omen Module Signer"; then
-    echo "✓ HP WMI module signing certificate is enrolled in MOK database"
-else
-    echo "✗ HP WMI module signing certificate is NOT enrolled in MOK database"
-    echo "Run 'ujust enroll-hp-wmi-mok' to enroll it"
-fi
+if mokutil --list-enrolled | grep -q "Bazzite Omen Module Signer"; then  
+    echo "✓ HP WMI module signing certificate is enrolled in MOK database"  
+else  
+    echo "✗ HP WMI module signing certificate is NOT enrolled in MOK database"  
+    echo "Run 'ujust enroll-hp-wmi-mok' to enroll it"  
+fi  
 
-echo ""
-echo "Secure Boot status:"
-if mokutil --sb-state | grep -q "SecureBoot enabled"; then
-    echo "✓ Secure Boot is enabled"
-else
-    echo "✗ Secure Boot is disabled"
+echo ""  
+echo "Secure Boot status:"  
+if mokutil --sb-state | grep -q "SecureBoot enabled"; then  
+    echo "✓ Secure Boot is enabled"  
+else  
+    echo "✗ Secure Boot is disabled"  
 fi
 
 # Remove HP WMI certificate from MOK database
@@ -382,24 +482,24 @@ remove-hp-wmi-mok:
 #!/usr/bin/bash
 set -euo pipefail
 
-MOK_KEY="/etc/pki/module-signing/module-signing.der"
+MOK_KEY="/etc/pki/module-signing/module-signing.der"  
 
-if [ ! -f "$MOK_KEY" ]; then
-    echo "ERROR: MOK certificate not found at $MOK_KEY"
-    exit 1
-fi
+if [ ! -f "$MOK_KEY" ]; then  
+    echo "ERROR: MOK certificate not found at $MOK_KEY"  
+    exit 1  
+fi  
 
-echo "Removing HP WMI module signing certificate from MOK database..."
-echo "You will be prompted to set a password for MOK removal."
-echo ""
+echo "Removing HP WMI module signing certificate from MOK database..."  
+echo "You will be prompted to set a password for MOK removal."  
+echo ""  
 
-if sudo mokutil --delete "$MOK_KEY"; then
-    echo ""
-    echo "SUCCESS: Certificate removal request submitted."
-    echo "Reboot and follow the MOK Manager prompts to complete removal."
-else
-    echo "ERROR: Failed to request certificate removal"
-    exit 1
+if sudo mokutil --delete "$MOK_KEY"; then  
+    echo ""  
+    echo "SUCCESS: Certificate removal request submitted."  
+    echo "Reboot and follow the MOK Manager prompts to complete removal."  
+else  
+    echo "ERROR: Failed to request certificate removal"  
+    exit 1  
 fi
 
 # Test HP WMI module loading
@@ -407,34 +507,39 @@ test-hp-wmi-module:
 #!/usr/bin/bash
 set -euo pipefail
 
-echo "Testing HP WMI module..."
+echo "Testing HP WMI module..."  
 
-if lsmod | grep -q hp_wmi; then
-    echo "Unloading existing hp-wmi module..."
-    sudo modprobe -r hp-wmi || true
-fi
+# Remove module if already loaded  
+if lsmod | grep -q hp_wmi; then  
+    echo "Unloading existing hp-wmi module..."  
+    sudo modprobe -r hp-wmi || true  
+fi  
 
-echo "Loading hp-wmi module..."
-if sudo modprobe hp-wmi; then
-    echo "✓ hp-wmi module loaded successfully"
+# Try to load the module  
+echo "Loading hp-wmi module..."  
+if sudo modprobe hp-wmi; then  
+    echo "✓ hp-wmi module loaded successfully"  
 
-    if lsmod | grep -q hp_wmi; then
-        echo "✓ hp-wmi module is active"
-        echo ""
-        echo "Module information:"
-        modinfo hp-wmi | head -10
-    else
-        echo "✗ hp-wmi module failed to stay loaded"
-    fi
-else
-    echo "✗ Failed to load hp-wmi module"
-    echo ""
-    echo "This might be due to:"
-    echo "1. Secure Boot is enabled but certificate is not enrolled in MOK"
-    echo "2. Module signature verification failed"
-    echo "3. Module compatibility issues"
-    echo ""
-    echo "Check dmesg for more details: dmesg | tail -20"
+    # Check if module is actually loaded  
+    if lsmod | grep -q hp_wmi; then  
+        echo "✓ hp-wmi module is active"  
+
+        # Show module info  
+        echo ""  
+        echo "Module information:"  
+        modinfo hp-wmi | head -10  
+    else  
+        echo "✗ hp-wmi module failed to stay loaded"  
+    fi  
+else  
+    echo "✗ Failed to load hp-wmi module"  
+    echo ""  
+    echo "This might be due to:"  
+    echo "1. Secure Boot is enabled but certificate is not enrolled in MOK"  
+    echo "2. Module signature verification failed"  
+    echo "3. Module compatibility issues"  
+    echo ""  
+    echo "Check dmesg for more details: dmesg | tail -20"  
 fi
 
 # Show help for HP WMI MOK management
@@ -464,6 +569,15 @@ echo ""
 echo "BUILD SUMMARY:"
 echo "=============="
 echo "Base Image: ${BASE_IMAGE:-unknown}"
+if [ "$NVIDIA_BASE" = true ]; then
+    echo "NVIDIA: ✓ Using NVIDIA base image (drivers pre-installed)"
+else
+    if [ "$NVIDIA_INSTALLED" = true ]; then
+        echo "NVIDIA: ✓ Drivers installed via akmods"
+    else
+        echo "NVIDIA: ⚠️  Driver installation failed or skipped"
+    fi
+fi
 echo ""
 echo "IMPORTANT NOTES:"
 echo "==============="
@@ -485,32 +599,48 @@ echo ""
 echo "4. Test module loading:"
 echo "   ujust test-hp-wmi-module"
 echo ""
-echo "5. For complete help:"
+if [ "$NVIDIA_INSTALLED" = true ]; then
+    echo "5. If NVIDIA modules aren't working:"
+    echo "   ujust rebuild-nvidia"
+    echo ""
+fi
+echo "6. For complete help:"
 echo "   ujust help-hp-wmi-mok"
 echo ""
-echo "6. Software installed:"
+echo "7. Software installed:"
 echo "   ✓ HP-WMI custom module (signed)"
+if [ "$NVIDIA_BASE" = true ]; then
+    echo "   ✓ NVIDIA drivers (pre-installed in base image)"
+elif [ "$NVIDIA_INSTALLED" = true ]; then
+    echo "   ✓ NVIDIA drivers with akmods (signed)"
+else
+    echo "   ⚠️  NVIDIA drivers (installation failed)"
+fi
+echo "   ✓ Rust programming language"
+echo "   ✓ Brave browser (Firefox removed)"
 echo "   ✓ Visual Studio Code"
-echo "   ✓ NVIDIA drivers via akmods (595.x, signed)"
-echo "   ✓ NVIDIA Container Toolkit"
-echo "   ✓ toolbox"
+if [ "$NVIDIA_INSTALLED" = true ] || [ "$NVIDIA_BASE" = true ]; then
+    echo "   ✓ CUDA development tools"
+fi
 echo ""
 if [ "$USING_PERSISTENT_KEYS" = false ]; then
     echo "⚠️  IMPORTANT: Consider setting up persistent key management"
     echo "   for production to avoid MOK re-enrollment after updates!"
 fi
-
 # Remove third-party repo files after packages are installed.
 # bootc-image-builder reads these during ISO manifest generation and
 # chokes on file:// GPG key paths that don't exist in its build context.
+# The packages are already installed — the repo files are no longer needed.
 echo "🧹 Removing third-party repo files..."
 
 rm -f /etc/yum.repos.d/terra-mesa.repo
 rm -f /etc/yum.repos.d/terra.repo
 rm -f /etc/yum.repos.d/vscode.repo
 rm -f /etc/yum.repos.d/nvidia-container-toolkit.repo
+rm -f /etc/yum.repos.d/tlp.repo
 rm -f /etc/yum.repos.d/_copr*.repo
 
+# Catch-all: remove any remaining repo with a file:// GPG key
 for repo in /etc/yum.repos.d/*.repo; do
     if grep -q 'gpgkey=file://' "$repo" 2>/dev/null; then
         echo "Removing $repo (has unresolvable file:// GPG key)"
