@@ -2,6 +2,12 @@
 name: Build ISO image
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - './disk_config/iso.toml'
+      - './.github/workflows/build-iso.yml'
   workflow_dispatch:
     inputs:
       upload-to-s3:

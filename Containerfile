@@ -28,6 +28,8 @@ RUN sed -i 's/^NAME=.*/NAME="Omenite"/' /etc/os-release && \
     sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Omenite Linux"/' /etc/os-release && \
     sed -i 's/^VARIANT=.*/VARIANT="Omenite"/' /etc/os-release && \
     sed -i 's/^VARIANT_ID=.*/VARIANT_ID="omenite"/' /etc/os-release && \
+    sed -i 's/^ID=.*/ID=omenite/' /etc/os-release && \
+    sed -i 's/^ID_LIKE=.*/ID_LIKE="bazzite fedora"/' /etc/os-release && \
     sed -i 's|^LOGO=.*|LOGO=omenite-logo|' /etc/os-release && \
     sed -i '/^LOGO=/a ICON_NAME="omenite-logo"' /etc/os-release && \
     mkdir -p /etc/ostree/remotes.d && \
@@ -43,6 +45,11 @@ RUN sed -i 's/^NAME=.*/NAME="Omenite"/' /etc/os-release && \
 
 # Copy Omenite logo to system locations for GNOME Settings and fastfetch
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    mkdir -p /usr/share/ublue-os/omenite /usr/share/fastfetch/presets && \
+    cp /ctx/omenite-ascii.txt /usr/share/ublue-os/omenite/ && \
+    cp /ctx/fastfetch.jsonc /usr/share/fastfetch/presets/omenite && \
+    echo 'alias fastfetch="fastfetch -c /usr/share/fastfetch/presets/omenite"' > /etc/profile.d/fastfetch-omenite.sh && \
+    chmod +x /etc/profile.d/fastfetch-omenite.sh && \
     cp /ctx/omenite-logo.png /usr/share/icons/hicolor/scalable/apps/ && \
     cp /ctx/omenite-logo.svg /usr/share/icons/hicolor/scalable/apps/ && \
     cp /ctx/omenite-logo.png /usr/share/pixmaps/omenite-logo.png && \
