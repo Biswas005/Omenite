@@ -1,53 +1,65 @@
 # Omenite
 
-Omenite is a custom Bazzite GNOME-based atomic / Bazzite GNOME-derived image for HP Omen laptops. It bakes in the custom `hp-wmi` kernel module, ships GNOME by default, and keeps the repo aligned with the current `ublue-os/image-template` layout.
+Omenite is a custom Bazzite GNOME-based atomic / Bazzite GNOME-derived OS image optimized specifically for HP Omen laptops. It bakes in the custom `hp-wmi` kernel module out-of-the-box, ships with GNOME by default, and keeps the repository aligned with the current `ublue-os/image-template` layout.
 
-## What is included
+## Features
 
-- Bazzite GNOME NVIDIA-based atomic image build
-- Custom HP Omen `hp-wmi` module compiled into the image
-- Omenite branding and logo assets
-- GitHub Actions for OCI image, QCOW2, and Anaconda ISO builds
-- Bootc disk-image fixes for `xfs` rootfs and the missing `disk_config/iso.toml` path
+- **Optimized for HP Omen Laptops:** Pre-compiled and integrated `hp-wmi` driver for full hardware control.
+- **NVIDIA Support Included:** Built upon the Bazzite GNOME NVIDIA-based atomic image to ensure seamless GPU support.
+- **Custom Branding:** Bespoke Omenite logos, Fastfetch configs, and boot splash screens to replace standard Bazzite branding.
+- **Automated ISO Generation:** GitHub Actions automatically builds the OCI image, QCOW2 disk images, and a bootable Anaconda ISO.
+- **Secure Boot Ready:** Generates and embeds Secure Boot signing keys for the custom `hp-wmi` module, ready for MOK enrollment upon installation.
+- **Bootc Enhancements:** Built-in disk-image fixes for `xfs` rootfs and proper ISO configurations.
 
-## Important paths
+## Installation
 
-- `build_files/hp-wmi.c` — custom driver source
-- `build_files/build.sh` — image customization script
-- `disk_config/disk.toml` — qcow2/raw image builder config
-- `disk_config/iso.toml` — anaconda ISO config used by GitHub Actions
+### Method 1: Fresh Installation via ISO (Recommended)
+You can download the bootable Anaconda ISO from the GitHub Actions artifacts once the CI pipeline finishes building.
+1. Flash the ISO to a USB drive.
+2. Boot from the USB drive.
+3. Install the OS via the Anaconda installer.
+4. On first boot, enroll the MOK (Machine Owner Key) if prompted, to allow the `hp-wmi` module to load with Secure Boot enabled.
 
-## GitHub secrets
+### Method 2: Rebase from an existing Atomic Fedora/Bazzite Install
+If you are already running an rpm-ostree based system (Silverblue, Kinoite, Bazzite), you can rebase directly:
+```bash
+rpm-ostree rebase ostree-unverified-registry:ghcr.io/biswas005/omenite:latest
+systemctl reboot
+```
 
-Optional but recommended for image signing:
+## Important Paths & Structure
 
-- `SIGNING_SECRET` — cosign private key for signing published container images
-- `COSIGN_PASSWORD` — only needed if `SIGNING_SECRET` contains an encrypted cosign key
+- `build_files/hp-wmi.c` — The custom driver source code for HP Omen laptops.
+- `build_files/build.sh` — The main image customization and compilation script.
+- `disk_config/disk.toml` — Configuration for qcow2/raw image builders.
+- `disk_config/iso.toml` — Configuration for the Anaconda ISO builder used by GitHub Actions.
+- `Containerfile` — The main OCI build instructions defining the layers, branding, and package installations.
 
-Optional for persistent Secure Boot signing of the custom module:
+## GitHub Secrets
 
+For maintaining your own fork, the following GitHub repository secrets are optional but recommended for image signing:
+
+- `SIGNING_SECRET` — cosign private key for signing published container images.
+- `COSIGN_PASSWORD` — only needed if `SIGNING_SECRET` contains an encrypted cosign key.
+
+Optional secrets for persistent Secure Boot signing of the custom module:
 - `MODULE_SIGNING_KEY_B64`
 - `MODULE_SIGNING_CRT_B64`
 - `MODULE_SIGNING_DER_B64`
 
-If those module-signing secrets are not provided, the build generates a fresh local keypair and embeds the public cert and DER file in the image for later MOK enrollment.
+*Note: If those module-signing secrets are not provided, the build generates a fresh local keypair and embeds the public cert and DER file in the image for later MOK enrollment.*
 
-## Notes
+## Licensing and Compliance
 
-The disk-image workflow expects the container image to be published first, then it converts `ghcr.io/<owner>/omenite:latest` into QCOW2 and Anaconda ISO artifacts.
+This project is licensed under the **Apache License 2.0**. 
 
+However, please note that Omenite is a Linux distribution that aggregates various software components with different licenses:
+- **`hp-wmi.c`** and other compiled Linux kernel modules are licensed under the **GPL** (General Public License).
+- The base image (Bazzite/Fedora) includes software under various open-source licenses (GPL, MIT, BSD, etc.).
 
-## Installer notes
+The Apache 2.0 license applies specifically to the build scripts, configuration files, branding assets, and custom integration code provided in this repository. This dual-licensing nature is standard for Linux distribution build repositories and is fully compliant.
 
-The Anaconda ISO configuration lives at `disk_config/iso.toml` only.
-The installer UI has Storage, Network, Security, Services, Users, Subscription, and Timezone modules enabled.
+## Acknowledgements
 
-
-## Default base image
-
-The repo now defaults to `ghcr.io/ublue-os/bazzite-gnome-nvidia:stable`, so NVIDIA support comes from the base image rather than manual RPM layering in `build.sh`.
-
-
-## Branding note
-
-Omenite keeps Fedora/Bazzite machine-readable `os-release` identity needed by `bootc-image-builder` for Anaconda artifacts, while overriding human-facing branding such as `NAME`, `PRETTY_NAME`, `VARIANT`, `LOGO`, installer product text, and logo assets.
+- Built using [BlueBuild](https://blue-build.org/) and the [ublue-os/image-template](https://github.com/ublue-os/image-template).
+- Based on [Bazzite](https://bazzite.gg/).

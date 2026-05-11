@@ -16,9 +16,11 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
     mkdir -p /tmp/secrets && \
-    echo "$module_signing_key" | base64 -d > /tmp/secrets/module-signing.key && \
-    echo "$module_signing_crt" | base64 -d > /tmp/secrets/module-signing.crt && \
-    echo "$module_signing_der" | base64 -d > /tmp/secrets/module-signing.der && \
+    if [ -n "$module_signing_key" ]; then \
+        echo "$module_signing_key" | base64 -d > /tmp/secrets/module-signing.key && \
+        echo "$module_signing_crt" | base64 -d > /tmp/secrets/module-signing.crt && \
+        echo "$module_signing_der" | base64 -d > /tmp/secrets/module-signing.der; \
+    fi && \
     /ctx/build.sh && \
     rm -rf /tmp/secrets && \
     ostree container commit
@@ -58,10 +60,7 @@ RUN \
     sed -i \
         -e 's|^NAME=.*|NAME="Omenite"|' \
         -e 's|^PRETTY_NAME=.*|PRETTY_NAME="Omenite Linux"|' \
-        -e 's|^ID=.*|ID=omenite|' \
-        -e 's|^ID_LIKE=.*|ID_LIKE="fedora"|' \
         -e 's|^VARIANT=.*|VARIANT="HP Omen Edition"|' \
-        -e 's|^VARIANT_ID=.*|VARIANT_ID=omenite|' \
         -e 's|^LOGO=.*|LOGO=omenite-logo|' \
         -e 's|^HOME_URL=.*|HOME_URL="https://github.com/Biswas005/Omenite"|' \
         -e 's|^DOCUMENTATION_URL=.*|DOCUMENTATION_URL="https://github.com/Biswas005/Omenite/wiki"|' \
@@ -107,7 +106,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
                      /usr/share/plymouth/themes/bgrt; do \
         if [ -d "$theme_dir" ]; then \
             cp /ctx/omenite-plymouth-logo.png "$theme_dir/logo.png" 2>/dev/null || true; \
-            cp /ctx/omenite-plymouth-logo.png "$theme_dir/watermark.png" 2>/dev/null || true; \
+            cp /ctx/omenite-plymouth-watermark.png "$theme_dir/watermark.png" 2>/dev/null || true; \
         fi; \
     done && \
     ostree container commit

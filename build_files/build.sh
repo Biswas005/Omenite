@@ -60,22 +60,11 @@ if [ -f "$SECRET_PATH/module-signing.key" ] && \
 
     echo "✅ Copied decoded module signing secrets successfully."
 else
-    echo "❌ ERROR: Module signing secrets not found in $SECRET_PATH!"
-    ls -la "$SECRET_PATH/" 2>/dev/null || echo "Directory doesn't exist"
-    exit 1
+    echo "⚠️  No pre-provided module signing secrets found in $SECRET_PATH"
+    echo "⚠️  Will generate temporary keys later in the build."
 fi
 
-# Create target dir and copy decoded files
-mkdir -p /etc/pki/module-signing/
-cp module-signing.key /etc/pki/module-signing/
-cp module-signing.crt /etc/pki/module-signing/
-cp module-signing.der /etc/pki/module-signing/
-
-chmod 600 /etc/pki/module-signing/module-signing.key
-chmod 644 /etc/pki/module-signing/module-signing.crt
-chmod 644 /etc/pki/module-signing/module-signing.der
-
-echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/"
+    echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/"
 
 # --- Persistent Key Setup ---
 setup_github_secrets_keys() {
@@ -89,21 +78,18 @@ setup_github_secrets_keys() {
             echo "❌ ERROR: Required file '$SIGNING_DIR/$file' not found!"
             echo "Available files in $SIGNING_DIR:"
             ls -la "$SIGNING_DIR/" 2>/dev/null || echo "Directory doesn't exist"
-            exit 1
+            return 1
         fi
     done
 
     # Verify permissions are correct
     if [ ! -r "$SIGNING_DIR/module-signing.key" ]; then
         echo "❌ ERROR: module-signing.key is not readable"
-        exit 1
+        return 1
     fi
 
     echo "✅ All module signing keys validated successfully in $SIGNING_DIR"
 }
-
-# 🔧 Invoke the secrets setup
-setup_github_secrets_keys || exit 1
 
 # Install base packages (always needed)
 echo "Installing build dependencies..."
