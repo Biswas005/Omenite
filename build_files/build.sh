@@ -474,8 +474,12 @@ rm -f /etc/yum.repos.d/nvidia-container-toolkit.repo
 rm -f /etc/yum.repos.d/tlp.repo
 rm -f /etc/yum.repos.d/_copr*.repo
 
-# Catch-all: remove any remaining repo with a file:// GPG key
+# Catch-all: remove any remaining repo with a file:// GPG key, EXCEPT fedora repos
 for repo in /etc/yum.repos.d/*.repo; do
+    # Skip core fedora repositories as they are required for ISO building
+    if [[ "$repo" == *"fedora"* ]]; then
+        continue
+    fi
     if grep -q 'gpgkey=file://' "$repo" 2>/dev/null; then
         echo "Removing $repo (has unresolvable file:// GPG key)"
         rm -f "$repo"
