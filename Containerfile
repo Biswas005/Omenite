@@ -89,7 +89,7 @@ RUN \
     mkdir -p /etc/xdg && \
     echo '[General]' > /etc/xdg/kcm-about-distrorc && \
     echo 'Name=Omenite Linux' >> /etc/xdg/kcm-about-distrorc && \
-    echo 'Version=1.0' >> /etc/xdg/kcm-about-distrorc && \
+    echo 'Version=44' >> /etc/xdg/kcm-about-distrorc && \
     echo 'Variant=HP Omen Edition' >> /etc/xdg/kcm-about-distrorc && \
     echo 'Website=https://github.com/Biswas005/Omenite' >> /etc/xdg/kcm-about-distrorc && \
     echo 'LogoPath=/usr/share/pixmaps/omenite-logo.png' >> /etc/xdg/kcm-about-distrorc && \
@@ -110,6 +110,9 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
             cp /ctx/omenite-logo.png "$theme_dir/watermark.png" 2>/dev/null || true; \
         fi; \
     done && \
+    KERNEL_VERSION=$(ls /lib/modules | head -n1) && \
+    dracut --no-hostonly --kver "$KERNEL_VERSION" --force "/lib/modules/$KERNEL_VERSION/initramfs.img" && \
+    chmod 0644 "/lib/modules/$KERNEL_VERSION/initramfs.img" && \
     ostree container commit
 
 # ─── 7. MOTD ────────────────────────────────────────────────────────────────
