@@ -95,7 +95,7 @@ Variant=HP Omen Edition
 Website=https://github.com/Biswas005/Omenite
 LogoPath=/usr/share/pixmaps/omenite-logo.png
 KCM_EOF
-    ostree container commit
+ostree container commit
 
 # ─── 5. fastfetch system-wide config ────────────────────────────────────────
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
@@ -127,7 +127,7 @@ RUN cat > /etc/motd << 'MOTD_EOF'
   https://github.com/Biswas005/Omenite
 
 MOTD_EOF
-    ostree container commit
+ostree container commit
 
 # ─── 8. GRUB / BLS entry rebranding hook ────────────────────────────────────
 RUN cat > /usr/lib/kernel/install.d/40-omenite-title.install << 'GRUB_EOF'
@@ -140,7 +140,7 @@ for entry in /boot/loader/entries/*.conf; do
     sed -i 's/\bBazzite\b/Omenite/g; s/\bbazzite\b/omenite/g' "$entry"
 done
 GRUB_EOF
-    chmod +x /usr/lib/kernel/install.d/40-omenite-title.install && \
+chmod +x /usr/lib/kernel/install.d/40-omenite-title.install && \
     ostree container commit
 
 # ─── 9. Final lint ──────────────────────────────────────────────────────────
