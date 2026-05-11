@@ -87,15 +87,13 @@ RUN \
 # The "Version" field overrides what KDE would otherwise get from VERSION_ID.
 RUN \
     mkdir -p /etc/xdg && \
-    cat > /etc/xdg/kcm-about-distrorc << 'KCM_EOF'
-[General]
-Name=Omenite Linux
-Version=1.0
-Variant=HP Omen Edition
-Website=https://github.com/Biswas005/Omenite
-LogoPath=/usr/share/pixmaps/omenite-logo.png
-KCM_EOF
-ostree container commit
+    echo '[General]' > /etc/xdg/kcm-about-distrorc && \
+    echo 'Name=Omenite Linux' >> /etc/xdg/kcm-about-distrorc && \
+    echo 'Version=1.0' >> /etc/xdg/kcm-about-distrorc && \
+    echo 'Variant=HP Omen Edition' >> /etc/xdg/kcm-about-distrorc && \
+    echo 'Website=https://github.com/Biswas005/Omenite' >> /etc/xdg/kcm-about-distrorc && \
+    echo 'LogoPath=/usr/share/pixmaps/omenite-logo.png' >> /etc/xdg/kcm-about-distrorc && \
+    ostree container commit
 
 # ─── 5. fastfetch system-wide config ────────────────────────────────────────
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
@@ -114,33 +112,31 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     ostree container commit
 
 # ─── 7. MOTD ────────────────────────────────────────────────────────────────
-RUN cat > /etc/motd << 'MOTD_EOF'
-
-  ██████╗ ███╗   ███╗███████╗███╗   ██╗██╗████████╗███████╗
- ██╔═══██╗████╗ ████║██╔════╝████╗  ██║██║╚══██╔══╝██╔════╝
- ██║   ██║██╔████╔██║█████╗  ██╔██╗ ██║██║   ██║   █████╗
- ██║   ██║██║╚██╔╝██║██╔══╝  ██║╚██╗██║██║   ██║   ██╔══╝
- ╚██████╔╝██║ ╚═╝ ██║███████╗██║ ╚████║██║   ██║   ███████╗
-  ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚══════╝
-
-  Omenite Linux — built for HP Omen
-  https://github.com/Biswas005/Omenite
-
-MOTD_EOF
-ostree container commit
+RUN \
+    echo "" > /etc/motd && \
+    echo "  ██████╗ ███╗   ███╗███████╗███╗   ██╗██╗████████╗███████╗" >> /etc/motd && \
+    echo " ██╔═══██╗████╗ ████║██╔════╝████╗  ██║██║╚══██╔══╝██╔════╝" >> /etc/motd && \
+    echo " ██║   ██║██╔████╔██║█████╗  ██╔██╗ ██║██║   ██║   █████╗" >> /etc/motd && \
+    echo " ██║   ██║██║╚██╔╝██║██╔══╝  ██║╚██╗██║██║   ██║   ██╔══╝" >> /etc/motd && \
+    echo " ╚██████╔╝██║ ╚═╝ ██║███████╗██║ ╚████║██║   ██║   ███████╗" >> /etc/motd && \
+    echo "  ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚══════╝" >> /etc/motd && \
+    echo "" >> /etc/motd && \
+    echo "  Omenite Linux — built for HP Omen" >> /etc/motd && \
+    echo "  https://github.com/Biswas005/Omenite" >> /etc/motd && \
+    echo "" >> /etc/motd && \
+    ostree container commit
 
 # ─── 8. GRUB / BLS entry rebranding hook ────────────────────────────────────
-RUN cat > /usr/lib/kernel/install.d/40-omenite-title.install << 'GRUB_EOF'
-#!/bin/bash
-# Rename BLS boot entry title from Bazzite → Omenite after every kernel install
-COMMAND="$1"
-[ "$COMMAND" = "add" ] || exit 0
-for entry in /boot/loader/entries/*.conf; do
-    [ -f "$entry" ] || continue
-    sed -i 's/\bBazzite\b/Omenite/g; s/\bbazzite\b/omenite/g' "$entry"
-done
-GRUB_EOF
-chmod +x /usr/lib/kernel/install.d/40-omenite-title.install && \
+RUN \
+    echo '#!/bin/bash' > /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo '# Rename BLS boot entry title from Bazzite → Omenite after every kernel install' >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo 'COMMAND="$1"' >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo '[ "$COMMAND" = "add" ] || exit 0' >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo 'for entry in /boot/loader/entries/*.conf; do' >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo '    [ -f "$entry" ] || continue' >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo "    sed -i 's/\bBazzite\b/Omenite/g; s/\bbazzite\b/omenite/g' \"\$entry\"" >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    echo 'done' >> /usr/lib/kernel/install.d/40-omenite-title.install && \
+    chmod +x /usr/lib/kernel/install.d/40-omenite-title.install && \
     ostree container commit
 
 # ─── 9. Final lint ──────────────────────────────────────────────────────────
