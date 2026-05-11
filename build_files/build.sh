@@ -65,24 +65,17 @@ else
     exit 1
 fi
 
-# Create target dir and copy decoded files to standard akmods paths
-mkdir -p /etc/pki/akmods/certs/
-cp module-signing.key /etc/pki/akmods/certs/private_key.priv
-cp module-signing.der /etc/pki/akmods/certs/public_key.der
-
-# Also keep them in module-signing for compatibility with our build script
+# Create target dir and copy decoded files
 mkdir -p /etc/pki/module-signing/
 cp module-signing.key /etc/pki/module-signing/
 cp module-signing.crt /etc/pki/module-signing/
 cp module-signing.der /etc/pki/module-signing/
 
-chmod 600 /etc/pki/akmods/certs/private_key.priv
-chmod 644 /etc/pki/akmods/certs/public_key.der
 chmod 600 /etc/pki/module-signing/module-signing.key
 chmod 644 /etc/pki/module-signing/module-signing.crt
 chmod 644 /etc/pki/module-signing/module-signing.der
 
-echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/ and /etc/pki/akmods/certs/"
+echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/"
 
 # --- Persistent Key Setup ---
 setup_github_secrets_keys() {
@@ -153,7 +146,7 @@ else
 
         # Generate X.509 certificate with timestamp to indicate temporary nature  
         openssl req -new -x509 -key module-signing.key -out module-signing.crt -days 3650 \
-            -subj "/CN=Bazzite Omen Module Signer TEMP-${BUILD_TIMESTAMP}/"  
+            -subj "/CN=Omenite Module Signer TEMP-${BUILD_TIMESTAMP}/"  
 
         # Convert certificate to DER format for MOK enrollment  
         openssl x509 -in module-signing.crt -outform DER -out module-signing.der  
@@ -273,26 +266,15 @@ rm -rf "$BUILD_DIR"
 
 echo "hp-wmi module installation completed successfully!"
 
-# Securely delete only the private key files after use
-echo "🧹 Cleaning up private key files..."
-
-# Clean up build directory private key
-if [ -f "$BUILD_DIR/module-signing.key" ]; then
-    shred -u "$BUILD_DIR/module-signing.key" || rm -f "$BUILD_DIR/module-signing.key"
-    echo "✅ Deleted build directory private key securely."
-else
-    echo "⚠️ No private key file found in build directory."
+# Securely wipe private key from persistent storage
+# (The build dir was already rm -rf'd above; clean the pki copy too)
+echo "🧹 Cleaning up private key..."
+if [ -f "/etc/pki/module-signing/module-signing.key" ]; then
+    shred -u /etc/pki/module-signing/module-signing.key ||         rm -f /etc/pki/module-signing/module-signing.key
+    echo "✅ Private key wiped from /etc/pki/module-signing/"
 fi
-
-# Clean up any remaining private key in /tmp/secrets (if it still exists)
-# Note: This should already be cleaned up by the Dockerfile, but just in case
-if [ -f "/tmp/secrets/module-signing.key" ]; then
-    shred -u "/tmp/secrets/module-signing.key" || rm -f "/tmp/secrets/module-signing.key"
-    echo "✅ Deleted /tmp/secrets private key securely."
-fi
-
 echo "🔒 Private key cleanup completed."
-echo "📋 Certificate files (.crt and .der) preserved for MOK enrollment."
+echo "📋 Certificate files (.crt .der) preserved at /etc/pki/module-signing/ for MOK enrollment."
 
 # Conditional NVIDIA Module Building and Signing
 ##################################################
@@ -416,9 +398,55 @@ rpm-ostree install toolbox
 # Enable services
 systemctl enable podman.socket
 
-# Note: Custom ujust recipe removed. 
-# Omenite now uses Bazzite's native `ujust enroll-secure-boot-key` 
-# which reads from /etc/pki/akmods/certs/public_key.der
+# Install MOK helper scripts and create ujust recipes
+echo "Installing Omenite MOK helper scripts..."
+mkdir -p /usr/libexec/omenite
+for script in enroll check delete test; do
+    cp "/ctx/scripts/omenite-mok-${script}.sh" "/usr/libexec/omenite/"
+    chmod +x "/usr/libexec/omenite/omenite-mok-${script}.sh"
+done
+
+echo "Creating ujust recipes for MOK enrollment..."
+mkdir -p /usr/share/ublue-os/just
+
+# NOTE: just recipes that run complex shell must delegate to an external
+# script to avoid heredoc / indentation conflicts in just syntax.
+cat > /usr/share/ublue-os/just/60-omenite-mok.just << 'UJUST_EOF'
+# Omenite — Secure Boot / MOK management
+
+# Enroll the Omenite module-signing cert in MOK (run once after install)
+enroll-mok:
+    @/usr/libexec/omenite/omenite-mok-enroll.sh
+
+# Check MOK enrollment status
+check-mok:
+    @/usr/libexec/omenite/omenite-mok-check.sh
+
+# Remove Omenite cert from MOK database
+delete-mok:
+    @/usr/libexec/omenite/omenite-mok-delete.sh
+
+# Test that the hp-wmi module loads correctly
+test-hp-wmi:
+    @/usr/libexec/omenite/omenite-mok-test.sh
+
+# Show MOK help
+help-mok:
+    @echo ""
+    @echo "Omenite Secure Boot / MOK commands:"
+    @echo "  ujust enroll-mok   — enroll signing cert in firmware MOK database"
+    @echo "  ujust check-mok    — check enrollment status"
+    @echo "  ujust delete-mok   — remove cert from MOK database"
+    @echo "  ujust test-hp-wmi  — test hp-wmi module loading"
+    @echo ""
+    @echo "Typical first-boot workflow:"
+    @echo "  1. ujust enroll-mok"
+    @echo "  2. reboot, follow blue MOK Manager screen"
+    @echo "  3. ujust test-hp-wmi"
+    @echo ""
+UJUST_EOF
+
+echo "ujust recipes created successfully!"
 
 # Final Build Summary
 #####################
@@ -446,20 +474,25 @@ if [ "$USING_PERSISTENT_KEYS" = true ]; then
 else
     echo "   ⚠️  Using TEMPORARY keys - MOK must be re-enrolled after updates"
 fi
-echo "   - Private Key: /etc/pki/akmods/certs/private_key.priv"
-echo "   - Public Key (DER): /etc/pki/akmods/certs/public_key.der"
+echo "   - Certificate: /etc/pki/module-signing/module-signing.crt"
+echo "   - DER format: /etc/pki/module-signing/module-signing.der"
 echo ""
 echo "2. If Secure Boot is enabled, enroll the signing certificate:"
-echo "   ujust enroll-secure-boot-key"
+echo "   ujust enroll-hp-wmi-mok"
 echo ""
-echo "3. Test module loading:"
-echo "   sudo modprobe hp-wmi"
+echo "3. Check MOK enrollment status:"
+echo "   ujust check-hp-wmi-mok"
+echo ""
+echo "4. Test module loading:"
+echo "   ujust test-hp-wmi-module"
 echo ""
 if [ "$NVIDIA_INSTALLED" = true ]; then
-    echo "4. If NVIDIA modules aren't working:"
+    echo "5. If NVIDIA modules aren't working:"
     echo "   ujust rebuild-nvidia"
     echo ""
 fi
+echo "6. For complete help:"
+echo "   ujust help-hp-wmi-mok"
 echo ""
 echo "7. Software installed:"
 echo "   ✓ HP-WMI custom module (signed)"
