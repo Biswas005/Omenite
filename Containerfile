@@ -105,9 +105,10 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     for theme_dir in /usr/share/plymouth/themes/bazzite \
                      /usr/share/plymouth/themes/spinner \
                      /usr/share/plymouth/themes/bgrt; do \
-        [ -d "$theme_dir" ] && \
-            cp /ctx/omenite-logo.png "$theme_dir/logo.png" 2>/dev/null || \
+        if [ -d "$theme_dir" ]; then \
+            cp /ctx/omenite-logo.png "$theme_dir/logo.png" 2>/dev/null || true; \
             cp /ctx/omenite-logo.png "$theme_dir/watermark.png" 2>/dev/null || true; \
+        fi; \
     done && \
     ostree container commit
 

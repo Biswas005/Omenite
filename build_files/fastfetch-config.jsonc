@@ -3,7 +3,6 @@
     "logo": {
         "source": "/usr/share/pixmaps/omenite-logo.png",
         "type": "kitty-direct",
-        "fallback": "omenite",
         "width": 30,
         "height": 15
     },
