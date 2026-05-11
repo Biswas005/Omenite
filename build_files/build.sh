@@ -332,45 +332,6 @@ fi
 
 dnf5 install -y nvidia-container-toolkit
 
-# Install Visual Studio Code
-##############################
-
-echo "Installing Visual Studio Code..."
-rpm --import https://packages.microsoft.com/keys/microsoft.asc
-
-cat > /etc/yum.repos.d/vscode.repo << 'VSCODE_REPO_EOF'
-[code]
-name=Visual Studio Code
-baseurl=https://packages.microsoft.com/yumrepos/vscode
-enabled=1
-autorefresh=1
-type=rpm-md
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc
-VSCODE_REPO_EOF
-
-dnf5 install -y code
-echo "Visual Studio Code installed successfully!"
-
-# Install firefox Browser
-########################
-dnf5 install -y firefox
-
-# Install Brave Browser
-# Add Brave repo (dnf5-compatible way)
-# echo "Adding Brave browser repository..."
-# cat > /etc/yum.repos.d/terra.repo << 'BRAVE_REPO_EOF'
-# [Brave]
-# name=Brave Browser
-# baseurl=https://brave-browser-rpm-release.s3.brave.com/x86_64
-# enabled=1
-# gpgcheck=1
-# gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-# BRAVE_REPO_EOF
-
-# dnf5 install -y brave-browser
-
-
 
 rpm-ostree install toolbox
     # Optional but recommended for full power-profilesctl compatibility (GNOME/KDE/Steam Deck UI):
