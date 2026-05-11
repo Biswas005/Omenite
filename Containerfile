@@ -110,9 +110,6 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
             cp /ctx/omenite-plymouth-logo.png "$theme_dir/watermark.png" 2>/dev/null || true; \
         fi; \
     done && \
-    KERNEL_VERSION=$(ls /lib/modules | head -n1) && \
-    dracut --no-hostonly --kver "$KERNEL_VERSION" --force "/lib/modules/$KERNEL_VERSION/initramfs.img" && \
-    chmod 0644 "/lib/modules/$KERNEL_VERSION/initramfs.img" && \
     ostree container commit
 
 # ─── 7. MOTD ────────────────────────────────────────────────────────────────
