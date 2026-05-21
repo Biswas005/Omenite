@@ -87,3 +87,14 @@ jobs:
           retention-days: 0
           compression-level: 0
           overwrite: true
+
+      - name: Create GitHub Release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Omenite 44 rev 1.0
+          tag_name: omenite-44-rev-1.0
+          files: ${{ steps.build.outputs.output-directory }}/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

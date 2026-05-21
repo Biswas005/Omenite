@@ -59,12 +59,22 @@ if [ -f "$SECRET_PATH/module-signing.key" ] && \
     chmod 600 module-signing.key
 
     echo "✅ Copied decoded module signing secrets successfully."
+
+    # Create target dir and copy decoded files to their persistent location
+    mkdir -p /etc/pki/module-signing/
+    cp "$SECRET_PATH/module-signing.key" /etc/pki/module-signing/
+    cp "$SECRET_PATH/module-signing.crt" /etc/pki/module-signing/
+    cp "$SECRET_PATH/module-signing.der" /etc/pki/module-signing/
+
+    chmod 600 /etc/pki/module-signing/module-signing.key
+    chmod 644 /etc/pki/module-signing/module-signing.crt
+    chmod 644 /etc/pki/module-signing/module-signing.der
+
+    echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/"
 else
     echo "⚠️  No pre-provided module signing secrets found in $SECRET_PATH"
     echo "⚠️  Will generate temporary keys later in the build."
 fi
-
-    echo "✅ Copied decoded keys and certs to /etc/pki/module-signing/"
 
 # --- Persistent Key Setup ---
 setup_github_secrets_keys() {
@@ -144,6 +154,11 @@ else
         echo "Generated temporary signing keys in PEM and DER formats"  
     fi
 fi
+
+# Symlink our DER certificate to Bazzite's standard akmods path
+# This allows the native `ujust enroll-secure-boot-key` command to find and enroll our key!
+mkdir -p /etc/pki/akmods/certs/
+ln -sf /etc/pki/module-signing/module-signing.der /etc/pki/akmods/certs/public_key.der
 
 # Show key information for debugging
 echo "Certificate Information:"
