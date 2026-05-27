@@ -90,7 +90,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Omenite 44 rev 1.0
           tag_name: omenite-44-rev-1.0
