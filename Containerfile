@@ -3,7 +3,7 @@ FROM scratch AS ctx
 COPY build_files/ assets/ /
 
 # ─── Base Image ─────────────────────────────────────────────────────────────
-FROM ghcr.io/ublue-os/bazzite-nvidia:stable
+FROM ghcr.io/ublue-os/bazzite-nvidia-open:stable
 
 # Build arguments for module-signing secrets (base64-encoded by CI)
 ARG module_signing_key
