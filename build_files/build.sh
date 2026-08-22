@@ -4,8 +4,17 @@ set -ouex pipefail
 echo "🚀 Build script starting..."
 echo "📦 Base image: ${BASE_IMAGE:-unknown}"
 
-# NVIDIA is always replaced with the latest repository-resolved driver stack.
-NVIDIA_INSTALLED=false
+# Check if we're building on a NVIDIA-enabled base image
+NVIDIA_BASE=false
+NVIDIA_INSTALLED=false  # Initialize the variable
+
+if [[ "${BASE_IMAGE:-}" == *"nvidia"* ]]; then
+    NVIDIA_BASE=true
+    NVIDIA_INSTALLED=true  # Set to true if using NVIDIA base
+    echo "🟢 NVIDIA base image detected — skipping NVIDIA driver installation"
+else
+    echo "🟡 Regular base image detected — NVIDIA drivers will be installed"
+fi
 
 # Detect and verify kernel version
 KERNEL_VERSION=$(rpm -q kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}')
@@ -96,32 +105,16 @@ setup_github_secrets_keys() {
 echo "Installing build dependencies..."
 dnf5 install -y kernel-devel kernel-headers gcc make kmod openssl mokutil elfutils-libelf-devel tmux
 
-# Ensure the repositories that provide the current NVIDIA packages are enabled.
-FEDORA_VERSION=$(rpm -E %fedora)
-dnf5 install -y \
-    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
-
-# Replace any driver stack supplied by the base image with the latest packages
-# available from the enabled Fedora/RPM Fusion repositories.
-echo "Removing existing NVIDIA and CUDA packages..."
-mapfile -t NVIDIA_PACKAGES < <(rpm -qa | grep -Ei '(^|[-_.])(akmod|kmod|xorg-x11-drv-)?nvidia|(^|[-_.])cuda|nvidia-container' || true)
-if [ "${#NVIDIA_PACKAGES[@]}" -gt 0 ]; then
-    dnf5 remove -y "${NVIDIA_PACKAGES[@]}"
-fi
-
-echo "Installing the latest Fedora NVIDIA driver stack via akmods..."
-# RPM Fusion's akmod %post invokes akmodsbuild, which refuses to run from the
-# root-owned image transaction. Build it explicitly below with akmods instead.
-if dnf5 install -y --setopt=tsflags=noscripts akmod-nvidia xorg-x11-drv-nvidia-cuda; then
-    getent group akmods >/dev/null || groupadd --system akmods
-    getent passwd akmods >/dev/null || useradd --system --gid akmods --home-dir /var/cache/akmods --shell /sbin/nologin akmods
-    install -d -o akmods -g akmods /var/cache/akmods
-    NVIDIA_INSTALLED=true
-    echo "✅ Latest NVIDIA drivers installed successfully"
-else
-    echo "❌ NVIDIA driver installation failed"
-    exit 1
+# Install NVIDIA drivers if not using NVIDIA base
+if [ "$NVIDIA_BASE" = false ]; then
+    echo "Installing NVIDIA drivers via akmods..."
+    if dnf5 install -y akmod-nvidia xorg-x11-drv-nvidia-cuda; then
+        NVIDIA_INSTALLED=true
+        echo "✅ NVIDIA drivers installed successfully"
+    else
+        echo "❌ NVIDIA driver installation failed"
+        NVIDIA_INSTALLED=false
+    fi
 fi
 
 # Persistent Key Management
@@ -274,6 +267,16 @@ rm -rf "$BUILD_DIR"
 
 echo "hp-wmi module installation completed successfully!"
 
+# Securely wipe private key from persistent storage
+# (The build dir was already rm -rf'd above; clean the pki copy too)
+echo "🧹 Cleaning up private key..."
+if [ -f "/etc/pki/module-signing/module-signing.key" ]; then
+    shred -u /etc/pki/module-signing/module-signing.key ||         rm -f /etc/pki/module-signing/module-signing.key
+    echo "✅ Private key wiped from /etc/pki/module-signing/"
+fi
+echo "🔒 Private key cleanup completed."
+echo "📋 Certificate files (.crt .der) preserved at /etc/pki/module-signing/ for MOK enrollment."
+
 # Conditional NVIDIA Module Building and Signing
 ##################################################
 
@@ -335,23 +338,13 @@ if [ "$NVIDIA_INSTALLED" = true ]; then
         echo "⚠️  No NVIDIA modules found to sign. They may be built on first boot."
     fi
 else
-    echo "⚠️  Skipping NVIDIA module building (installation failed)"
+    if [ "$NVIDIA_BASE" = true ]; then
+        echo "✓ Skipping NVIDIA module building (using NVIDIA base image)"
+    else
+        echo "⚠️  Skipping NVIDIA module building (installation failed)"
+    fi
 fi
 
-# Securely wipe private key from persistent storage after all modules are signed.
-echo "🧹 Cleaning up private key..."
-if [ -f "/etc/pki/module-signing/module-signing.key" ]; then
-    shred -u /etc/pki/module-signing/module-signing.key || rm -f /etc/pki/module-signing/module-signing.key
-    echo "✅ Private key wiped from /etc/pki/module-signing/"
-fi
-echo "🔒 Private key cleanup completed."
-echo "📋 Certificate files (.crt .der) preserved at /etc/pki/module-signing/ for MOK enrollment."
-
-echo "Enabling the NVIDIA Container Toolkit repository..."
-dnf5 install -y curl
-curl -fsSL \
-    https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
-    -o /etc/yum.repos.d/nvidia-container-toolkit.repo
 dnf5 install -y nvidia-container-toolkit
 
 
@@ -425,10 +418,14 @@ echo ""
 echo "BUILD SUMMARY:"
 echo "=============="
 echo "Base Image: ${BASE_IMAGE:-unknown}"
-if [ "$NVIDIA_INSTALLED" = true ]; then
-    echo "NVIDIA: ✓ Latest drivers installed via akmods"
+if [ "$NVIDIA_BASE" = true ]; then
+    echo "NVIDIA: ✓ Using NVIDIA base image (drivers pre-installed)"
 else
-    echo "NVIDIA: ⚠️  Driver installation failed"
+    if [ "$NVIDIA_INSTALLED" = true ]; then
+        echo "NVIDIA: ✓ Drivers installed via akmods"
+    else
+        echo "NVIDIA: ⚠️  Driver installation failed or skipped"
+    fi
 fi
 echo ""
 echo "IMPORTANT NOTES:"
@@ -461,15 +458,17 @@ echo "   ujust help-hp-wmi-mok"
 echo ""
 echo "7. Software installed:"
 echo "   ✓ HP-WMI custom module (signed)"
-if [ "$NVIDIA_INSTALLED" = true ]; then
-    echo "   ✓ Latest NVIDIA drivers with akmods (signed)"
+if [ "$NVIDIA_BASE" = true ]; then
+    echo "   ✓ NVIDIA drivers (pre-installed in base image)"
+elif [ "$NVIDIA_INSTALLED" = true ]; then
+    echo "   ✓ NVIDIA drivers with akmods (signed)"
 else
     echo "   ⚠️  NVIDIA drivers (installation failed)"
 fi
 echo "   ✓ Rust programming language"
 echo "   ✓ Brave browser (Firefox removed)"
 echo "   ✓ Visual Studio Code"
-if [ "$NVIDIA_INSTALLED" = true ]; then
+if [ "$NVIDIA_INSTALLED" = true ] || [ "$NVIDIA_BASE" = true ]; then
     echo "   ✓ CUDA development tools"
 fi
 echo ""
