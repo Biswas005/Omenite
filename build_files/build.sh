@@ -111,7 +111,12 @@ if [ "${#NVIDIA_PACKAGES[@]}" -gt 0 ]; then
 fi
 
 echo "Installing the latest Fedora NVIDIA driver stack via akmods..."
-if dnf5 install -y akmod-nvidia xorg-x11-drv-nvidia-cuda; then
+# RPM Fusion's akmod %post invokes akmodsbuild, which refuses to run from the
+# root-owned image transaction. Build it explicitly below with akmods instead.
+if dnf5 install -y --setopt=tsflags=noscripts akmod-nvidia xorg-x11-drv-nvidia-cuda; then
+    getent group akmods >/dev/null || groupadd --system akmods
+    getent passwd akmods >/dev/null || useradd --system --gid akmods --home-dir /var/cache/akmods --shell /sbin/nologin akmods
+    install -d -o akmods -g akmods /var/cache/akmods
     NVIDIA_INSTALLED=true
     echo "✅ Latest NVIDIA drivers installed successfully"
 else
