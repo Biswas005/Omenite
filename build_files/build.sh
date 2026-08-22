@@ -96,6 +96,12 @@ setup_github_secrets_keys() {
 echo "Installing build dependencies..."
 dnf5 install -y kernel-devel kernel-headers gcc make kmod openssl mokutil elfutils-libelf-devel tmux
 
+# Ensure the repositories that provide the current NVIDIA packages are enabled.
+FEDORA_VERSION=$(rpm -E %fedora)
+dnf5 install -y \
+    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
+
 # Replace any driver stack supplied by the base image with the latest packages
 # available from the enabled Fedora/RPM Fusion repositories.
 echo "Removing existing NVIDIA and CUDA packages..."
@@ -110,7 +116,7 @@ if dnf5 install -y akmod-nvidia xorg-x11-drv-nvidia-cuda; then
     echo "✅ Latest NVIDIA drivers installed successfully"
 else
     echo "❌ NVIDIA driver installation failed"
-    NVIDIA_INSTALLED=false
+    exit 1
 fi
 
 # Persistent Key Management
@@ -336,6 +342,11 @@ fi
 echo "🔒 Private key cleanup completed."
 echo "📋 Certificate files (.crt .der) preserved at /etc/pki/module-signing/ for MOK enrollment."
 
+echo "Enabling the NVIDIA Container Toolkit repository..."
+dnf5 install -y curl
+curl -fsSL \
+    https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
+    -o /etc/yum.repos.d/nvidia-container-toolkit.repo
 dnf5 install -y nvidia-container-toolkit
 
 
